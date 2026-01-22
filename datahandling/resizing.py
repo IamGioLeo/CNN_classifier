@@ -152,3 +152,13 @@ def crop_image(image_path: str = "dataset/15-Scene Image Dataset/15-Scene/00", t
 #    target_mirror_path = "dataset/augmented/mirror/" + dir.name
 #    for img in dir.iterdir():
 #        mirror_image(dir, target_mirror_path, img.name)
+
+
+
+## test for images if in grayscale --> they are in grayscale
+#path_to_image = Path("dataset/resized/00/1.jpg")
+#img = Image.open(path_to_image)
+#if img.mode == "L":
+#    print("Image is grayscale")
+#else:
+#    print("Image is NOT grayscale")
