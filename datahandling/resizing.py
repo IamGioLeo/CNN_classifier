@@ -19,6 +19,7 @@ def resize_image(image_path="dataset/15-Scene Image Dataset/15-Scene/00", target
     else:
         image = Image.open(origin_path)
         resized = image.resize((64, 64))
+        resized = resized.convert("L")
         resized.save(target_path)
         print(f"Image saved to {target_path}")
 
@@ -42,6 +43,7 @@ def mirror_image(image_path: str = "dataset/resized/00", target_path: str = "dat
     else:
         mirror_image = Image.open(origin_path)
         mirror_image = ImageOps.mirror(mirror_image)
+        mirror_image = mirror_image.convert("L")
         mirror_image.save(target_path)
         print(f"Image saved to {target_path}")
 
@@ -106,18 +108,22 @@ def crop_image(image_path: str = "dataset/15-Scene Image Dataset/15-Scene/00", t
 
             cropped_image_0 = image.crop((top_x_0, top_y_0, bottom_x_0, bottom_y_0))
             cropped_image_0 = cropped_image_0.resize((64, 64))
+            cropped_image_0 = cropped_image_0.convert("L")
             cropped_image_0.save(augmented_path_0)
 
             cropped_image_1 = image.crop((top_x_1, top_y_0, bottom_x_1, bottom_y_0))
             cropped_image_1 = cropped_image_1.resize((64, 64))
+            cropped_image_1 = cropped_image_1.convert("L")
             cropped_image_1.save(augmented_path_1)
 
             cropped_image_2 = image.crop((top_x_0, top_y_1, bottom_x_0, bottom_y_1))
             cropped_image_2 = cropped_image_2.resize((64, 64))
+            cropped_image_2.convert("L")
             cropped_image_2.save(augmented_path_2)
 
             cropped_image_3 = image.crop((top_x_1, top_y_1, bottom_x_1, bottom_y_1))
             cropped_image_3 = cropped_image_3.resize((64, 64))
+            cropped_image_3 = cropped_image_3.convert("L")
             cropped_image_3.save(augmented_path_3)
             
             print(f"Image saved to {augmented_path_0}")
@@ -155,10 +161,30 @@ def crop_image(image_path: str = "dataset/15-Scene Image Dataset/15-Scene/00", t
 
 
 
-## test for images if in grayscale --> they are in grayscale
-#path_to_image = Path("dataset/resized/00/1.jpg")
-#img = Image.open(path_to_image)
-#if img.mode == "L":
-#    print("Image is grayscale")
-#else:
-#    print("Image is NOT grayscale")
+## check grayscale and convert if not 
+#path_to_images = Path("dataset/resized")
+#for dir in path_to_images.iterdir():
+#    for path_img in dir.iterdir():
+#        img = Image.open(path_img)
+#        if img.mode != "L":
+#            print(f"Image {path_img.name} is NOT grayscale")
+#            img = img.convert("L")
+#            img.save(path_img)
+#
+#path_to_images_2 = Path("dataset/augmented/mirror")
+#for dir in path_to_images_2.iterdir():
+#    for path_img in dir.iterdir():
+#        img = Image.open(path_img)
+#        if img.mode != "L":
+#            print(f"Image {path_img.name} is NOT grayscale")
+#            img = img.convert("L")
+#            img.save(path_img)
+#
+#path_to_images_3 = Path("dataset/augmented/cropping")
+#for dir in path_to_images_3.iterdir():
+#    for path_img in dir.iterdir():
+#        img = Image.open(path_img)
+#        if img.mode != "L":
+#            print(f"Image {path_img.name} is NOT grayscale")
+#            img = img.convert("L")
+#            img.save(path_img)
