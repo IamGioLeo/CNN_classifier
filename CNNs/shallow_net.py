@@ -24,8 +24,11 @@ class ShallowCNN(nn.Module):
     def _initialize_weights(self):
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
-                nn.init.normal_(m.weight, mean=0.0, std=0.011)
-                nn.init.constant_(m.bias, 0)
+                nn.init.normal_(m.weight, mean=0.0, std=0.01)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+
+
     
     def forward(self, x):
         x = self.features(x)
