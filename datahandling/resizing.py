@@ -133,7 +133,7 @@ def crop_image(image_path: str = "dataset/15-Scene Image Dataset/15-Scene/00", t
 ## questo di seguito è il seguito per genereare le immagini modificate e ridimensionate,
 ## prima di usare fare test per vedere se funzionano bene i path:
 #
-#base_directory = Path("dataset/15-Scene Image Dataset/15-Scene")
+base_directory = Path("./dataset/15-Scene Image Dataset/15-Scene")
 #
 ## test 1
 #
@@ -146,45 +146,45 @@ def crop_image(image_path: str = "dataset/15-Scene Image Dataset/15-Scene/00", t
 #    for img in dir.iterdir():
 #        print(img.name)
 #
-#for dir in base_directory.iterdir():
-#    target_resize_path = "dataset/resized/" + dir.name
-#    target_cropping_path = "dataset/augmented/cropping/" + dir.name
-#    for img in dir.iterdir():
-#        resize_image(dir, target_resize_path, img.name)
-#        crop_image(dir, target_cropping_path, img.name)
-#
-#resize_path = Path("dataset/resized") 
-#for dir in resize_path.iterdir():
-#    target_mirror_path = "dataset/augmented/mirror/" + dir.name
-#    for img in dir.iterdir():
-#        mirror_image(dir, target_mirror_path, img.name)
+for dir in base_directory.iterdir():
+    target_resize_path = "dataset/resized/" + dir.name
+    target_cropping_path = "dataset/augmented/cropping/" + dir.name
+    for img in dir.iterdir():
+        resize_image(dir, target_resize_path, img.name)
+        crop_image(dir, target_cropping_path, img.name)
+
+resize_path = Path("dataset/resized") 
+for dir in resize_path.iterdir():
+    target_mirror_path = "dataset/augmented/mirror/" + dir.name
+    for img in dir.iterdir():
+        mirror_image(dir, target_mirror_path, img.name)
 
 
 
 ## check grayscale and convert if not 
-#path_to_images = Path("dataset/resized")
-#for dir in path_to_images.iterdir():
-#    for path_img in dir.iterdir():
-#        img = Image.open(path_img)
-#        if img.mode != "L":
-#            print(f"Image {path_img.name} is NOT grayscale")
-#            img = img.convert("L")
-#            img.save(path_img)
-#
-#path_to_images_2 = Path("dataset/augmented/mirror")
-#for dir in path_to_images_2.iterdir():
-#    for path_img in dir.iterdir():
-#        img = Image.open(path_img)
-#        if img.mode != "L":
-#            print(f"Image {path_img.name} is NOT grayscale")
-#            img = img.convert("L")
-#            img.save(path_img)
-#
-#path_to_images_3 = Path("dataset/augmented/cropping")
-#for dir in path_to_images_3.iterdir():
-#    for path_img in dir.iterdir():
-#        img = Image.open(path_img)
-#        if img.mode != "L":
-#            print(f"Image {path_img.name} is NOT grayscale")
-#            img = img.convert("L")
-#            img.save(path_img)
+path_to_images = Path("dataset/resized")
+for dir in path_to_images.iterdir():
+    for path_img in dir.iterdir():
+        img = Image.open(path_img)
+        if img.mode != "L":
+            print(f"Image {path_img.name} is NOT grayscale")
+            img = img.convert("L")
+            img.save(path_img)
+
+path_to_images_2 = Path("dataset/augmented/mirror")
+for dir in path_to_images_2.iterdir():
+    for path_img in dir.iterdir():
+        img = Image.open(path_img)
+        if img.mode != "L":
+            print(f"Image {path_img.name} is NOT grayscale")
+            img = img.convert("L")
+            img.save(path_img)
+
+path_to_images_3 = Path("dataset/augmented/cropping")
+for dir in path_to_images_3.iterdir():
+    for path_img in dir.iterdir():
+        img = Image.open(path_img)
+        if img.mode != "L":
+            print(f"Image {path_img.name} is NOT grayscale")
+            img = img.convert("L")
+            img.save(path_img)

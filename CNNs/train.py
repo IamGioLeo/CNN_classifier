@@ -6,6 +6,7 @@ from torchvision import datasets, transforms
 from sklearn.model_selection import train_test_split
 import numpy as np
 import os
+import matplotlib.pyplot as plt
 
 from shallow_net import ShallowCNN
 
@@ -14,8 +15,8 @@ print(f"Using device: {device}")
 
 BATCH_SIZE = 32
 NUM_EPOCHS = 40
-LEARNING_RATE = 0.01 # To be set...
-MOMENTUM = 0.9
+LEARNING_RATES = [0.01, 0.001] # To be set...
+MOMENTUMS = [0.5, 0.7, 0.9]
 
 
 ## this is for not correct size images
@@ -46,7 +47,8 @@ transform = transforms.Compose([
 
 
 dataset = datasets.ImageFolder(
-    root="/home/leo/CNN_classifier/dataset/resized",
+    #root="/home/leo/CNN_classifier/dataset/resized",
+    root="./dataset/resized",
     transform=transform
 )
 
@@ -85,70 +87,111 @@ val_loader = DataLoader(
     val_set, batch_size=BATCH_SIZE, shuffle=False
 )
 
-model = ShallowCNN().to(device)
-criterion = nn.CrossEntropyLoss()
+for lr in LEARNING_RATES:
+    for momentum in MOMENTUMS:
+        print("\n" + "-"*100)
+        print(f"Training with LEARNING_RATE={lr}, MOMENTUM={momentum}")
 
-optimizer = optim.SGD(
-    model.parameters(),
-    lr=LEARNING_RATE,
-    momentum=MOMENTUM
-)
+        model = ShallowCNN().to(device)
+        criterion = nn.CrossEntropyLoss()
 
-## next try 
-#optimizer = optim.Adam(model.parameters(), lr=1e-3)
+        optimizer = optim.SGD(
+            model.parameters(),
+            lr=lr,
+            momentum=momentum
+        )
 
-train_losses, val_losses = [], []
-train_accs, val_accs = [], []
+        ## next try 
+        #optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
-for epoch in range(NUM_EPOCHS):
-    model.train()
-    running_loss = 0.0
-    correct = 0
-    total = 0
+        train_losses, val_losses = [], []
+        train_accs, val_accs = [], []
+        global_correct = 0
+        global_total = 0
 
-    for images, labels in train_loader:
-        images, labels = images.to(device), labels.to(device)
+        for epoch in range(NUM_EPOCHS):
+            model.train()
+            running_loss = 0.0
+            correct = 0
+            total = 0
 
-        optimizer.zero_grad()
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
+            for images, labels in train_loader:
+                images, labels = images.to(device), labels.to(device)
 
-        running_loss += loss.item()
-        _, predicted = torch.max(outputs, 1)
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
+                optimizer.zero_grad()
+                outputs = model(images)
+                loss = criterion(outputs, labels)
+                loss.backward()
+                optimizer.step()
 
-    train_loss = running_loss / len(train_loader)
-    train_acc = correct / total
+                running_loss += loss.item()
+                _, predicted = torch.max(outputs, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
 
-    train_losses.append(train_loss)
-    train_accs.append(train_acc)
+            train_loss = running_loss / len(train_loader)
+            train_acc = correct / total * 100
 
-    model.eval()
-    running_loss = 0.0
-    correct = 0
-    total = 0
+            train_losses.append(train_loss)
+            train_accs.append(train_acc)
 
-    with torch.no_grad():
-        for images, labels in val_loader:
-            images, labels = images.to(device), labels.to(device)
+            model.eval()
+            running_loss = 0.0
+            correct = 0
+            total = 0
 
-            outputs = model(images)
-            loss = criterion(outputs, labels)
+            with torch.no_grad():
+                for images, labels in val_loader:
+                    images, labels = images.to(device), labels.to(device)
 
-            running_loss += loss.item()
-            _, predicted = torch.max(outputs, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+                    outputs = model(images)
+                    loss = criterion(outputs, labels)
 
-    val_loss = running_loss / len(val_loader)
-    val_acc = correct / total
-    val_losses.append(val_loss)
-    val_accs.append(val_acc)
-    print(
-        f"Epoch [{epoch+1}/{NUM_EPOCHS}] | "
-        f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.3f} | "
-        f"Val Loss {val_loss:.4f} | Val Acc: {val_acc:.3f}"
-    )
+                    running_loss += loss.item()
+                    _, predicted = torch.max(outputs, 1)
+                    total += labels.size(0)
+                    correct += (predicted == labels).sum().item()
+
+                    global_correct += (predicted == labels).sum().item()
+                    global_total += labels.size(0)
+
+            val_loss = running_loss / len(val_loader)
+            val_acc = correct / total * 100
+            val_losses.append(val_loss)
+            val_accs.append(val_acc)
+            print(
+                f"Epoch [{epoch+1}/{NUM_EPOCHS}] | "
+                f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
+                f"Val Loss {val_loss:.4f} | Val Acc: {val_acc:.2f}%"
+            )
+
+        global_accuracy = global_correct / global_total * 100
+        print(
+            f"GLOBAL ACCURACY | LR={lr}, Momentum={momentum} | "
+            f"Accuracy: {global_accuracy:.2f}%"
+        )
+
+# plt.figure(figsize=(10, 4))
+# 
+# # Loss
+# plt.subplot(1, 2, 1)
+# plt.plot(train_losses, label='Train Loss')
+# plt.plot(val_losses, label='Val Loss')
+# plt.xlabel('Epoch')
+# plt.ylabel('Loss')
+# plt.title('Loss during training')
+# plt.legend()
+# plt.grid(True)
+# 
+# # Accuracy
+# plt.subplot(1, 2, 2)
+# plt.plot(train_accs, label='Train Accuracy')
+# plt.plot(val_accs, label='Val Accuracy')
+# plt.xlabel('Epoch')
+# plt.ylabel('Accuracy')
+# plt.title('Accuracy during training')
+# plt.legend()
+# plt.grid(True)
+# 
+# plt.tight_layout()
+# plt.show()
