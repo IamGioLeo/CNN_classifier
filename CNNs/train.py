@@ -7,6 +7,8 @@ from sklearn.model_selection import train_test_split
 import numpy as np
 import os
 import matplotlib.pyplot as plt
+from sklearn.metrics import confusion_matrix
+
 
 from shallow_net import ShallowCNN
 
@@ -15,9 +17,10 @@ print(f"Using device: {device}")
 
 BATCH_SIZE = 32
 NUM_EPOCHS = 40
-LEARNING_RATES = [0.01, 0.001] # To be set...
+LEARNING_RATES = [0.01, 0.001, 0.0001] # To be set...
 MOMENTUMS = [0.5, 0.7, 0.9]
-
+PATIENCE = 5
+OUTPUT_FILE = "shallow_net_v_01_results.txt"
 
 ## this is for not correct size images
 #transform = transforms.Compose([
@@ -35,9 +38,6 @@ MOMENTUMS = [0.5, 0.7, 0.9]
 #    transforms.Normalize(mean=[0.5], std=[0.5])
 #])
 
-# looks like the problem with the ToTensor() method is that puts the valuse of the array in the range [0,1]
-# with the initialization of weights parameters the professor told us this is distruptive:
-# weights start with low values * low values of the ToTensor method make the network almost inactive
 
 transform = transforms.Compose([
     transforms.Grayscale(num_output_channels=1),
@@ -66,15 +66,22 @@ dataset = datasets.ImageFolder(
 #
 #dataset = ConcatDataset([dataset, dataset_2])
 
-train_size = int(0.85 * len(dataset))
-val_size = len(dataset) - train_size
+trainval_size = int(0.85 * len(dataset))
+test_size = len(dataset) - trainval_size
+
+train_set, test_set = torch.utils.data.random_split(
+    dataset, [trainval_size, test_size]
+)
+
+val_size = int(0.15 * trainval_size)
+train_size = trainval_size - val_size
+
+## final part of data augmentation
+#train_set = ConcatDataset([train_set, dataset_3])
 
 train_set, val_set = torch.utils.data.random_split(
     dataset, [train_size, val_size]
 )
-
-## final part of data augmentation
-#train_set = ConcatDataset([train_set, dataset_3])
 
 train_loader = DataLoader(
     train_set, batch_size=BATCH_SIZE, shuffle=True
@@ -84,11 +91,21 @@ train_loader = DataLoader(
 #print(images.shape)
 
 val_loader = DataLoader(
-    val_set, batch_size=BATCH_SIZE, shuffle=False
+    val_set, batch_size=BATCH_SIZE, shuffle=True
 )
 
+
+test_loader = DataLoader(
+    test_set, batch_size=BATCH_SIZE, shuffle=True
+)
+with open(OUTPUT_FILE, "a") as f:
+    f.write("\r\n\nNEW TRIANING SESSION")
+print("\r\n\nNEW TRIANING SESSION")
 for lr in LEARNING_RATES:
     for momentum in MOMENTUMS:
+        with open(OUTPUT_FILE, "a") as f:
+            f.write("\r\n" + "-"*100)
+            f.write(f"\r\nTraining with LEARNING_RATE={lr}, MOMENTUM={momentum}")
         print("\n" + "-"*100)
         print(f"Training with LEARNING_RATE={lr}, MOMENTUM={momentum}")
 
@@ -108,6 +125,9 @@ for lr in LEARNING_RATES:
         train_accs, val_accs = [], []
         global_correct = 0
         global_total = 0
+
+        best_val_loss = float('inf')
+        epochs_wo_improve = 0
 
         for epoch in range(NUM_EPOCHS):
             model.train()
@@ -159,17 +179,76 @@ for lr in LEARNING_RATES:
             val_acc = correct / total * 100
             val_losses.append(val_loss)
             val_accs.append(val_acc)
+            with open(OUTPUT_FILE, "a") as f:
+                for line in [
+                    f"\r\nEpoch [{epoch+1}/{NUM_EPOCHS}] | "
+                    f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
+                    f"Val Loss {val_loss:.4f} | Val Acc: {val_acc:.2f}%"
+                ]:
+                    f.write(line)
             print(
                 f"Epoch [{epoch+1}/{NUM_EPOCHS}] | "
                 f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
                 f"Val Loss {val_loss:.4f} | Val Acc: {val_acc:.2f}%"
             )
 
+
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                epochs_no_improve = 0
+            else:
+                epochs_no_improve += 1
+            
+            if epochs_no_improve >= PATIENCE:
+                with open(OUTPUT_FILE, "a") as f:
+                    f.write("\r\nEarly stopping triggered\n")
+                print("Early stopping triggered")
+                break
+                         
+
+        model.eval()
+
+        all_preds = []
+        all_labels = []
+
+        with torch.no_grad():
+            for images, labels in test_loader:
+                images = images.to(device)
+                labels = labels.to(device)
+
+                outputs = model(images)
+                _, predicted = torch.max(outputs, 1)
+
+                all_preds.append(predicted.cpu())
+                all_labels.append(labels.cpu())
+
+        all_preds = torch.cat(all_preds).numpy()
+        all_labels = torch.cat(all_labels).numpy()
+
+        test_accuracy = (all_preds == all_labels).mean() * 100
+
+        cm = confusion_matrix(all_labels, all_preds)
+
+
         global_accuracy = global_correct / global_total * 100
-        print(
-            f"GLOBAL ACCURACY | LR={lr}, Momentum={momentum} | "
-            f"Accuracy: {global_accuracy:.2f}%"
-        )
+        with open(OUTPUT_FILE, "a") as f:
+            for line in [
+                f"GLOBAL ACCURACY | LR={lr}, Momentum={momentum} | Accuracy: {global_accuracy:.2f}%",
+                f"TEST ACCURACY | LR={lr}, Momentum={momentum} | Accuracy: {test_accuracy:.2f}%",
+                "Confusion Matrix:",
+                str(cm),
+                "-"*50
+            ]:
+                print(line)
+                f.write(line + "\n")
+        #plt.figure(figsize=(6, 6))
+        #plt.imshow(cm)
+        #plt.title("Confusion Matrix")
+        #plt.xlabel("Predicted")
+        #plt.ylabel("True")
+        #plt.colorbar()
+        #plt.show()
+        
 
 # plt.figure(figsize=(10, 4))
 # 
