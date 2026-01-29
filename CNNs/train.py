@@ -69,7 +69,7 @@ dataset = datasets.ImageFolder(
 trainval_size = int(0.85 * len(dataset))
 test_size = len(dataset) - trainval_size
 
-train_set, test_set = torch.utils.data.random_split(
+trainval_set, test_set = torch.utils.data.random_split(
     dataset, [trainval_size, test_size]
 )
 
@@ -80,7 +80,7 @@ train_size = trainval_size - val_size
 #train_set = ConcatDataset([train_set, dataset_3])
 
 train_set, val_set = torch.utils.data.random_split(
-    dataset, [train_size, val_size]
+    trainval_set, [train_size, val_size]
 )
 
 train_loader = DataLoader(
@@ -126,8 +126,9 @@ for lr in LEARNING_RATES:
         global_correct = 0
         global_total = 0
 
+        best_val_acc = 0
         best_val_loss = float('inf')
-        epochs_wo_improve = 0
+        epochs_no_improve = 0
 
         for epoch in range(NUM_EPOCHS):
             model.train()
@@ -191,8 +192,11 @@ for lr in LEARNING_RATES:
                 f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
                 f"Val Loss {val_loss:.4f} | Val Acc: {val_acc:.2f}%"
             )
-
-
+            
+            if val_acc > best_val_acc:
+                best_val_acc = val_acc
+                torch.save(model.state_dict(), "best_model.pt")
+            
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
                 epochs_no_improve = 0
@@ -205,7 +209,7 @@ for lr in LEARNING_RATES:
                 print("Early stopping triggered")
                 break
                          
-
+        model.load_state_dict(torch.load("best_model.pt", map_location=device))
         model.eval()
 
         all_preds = []
