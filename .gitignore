@@ -3,3 +3,8 @@ CVPR_2025__Projects_assignments.pdf
 /temp-venv
 /__pycache__
 /venv_CVPR_project
+/curves
+/confusion_matrixes
+/parameters_experimental_results
+best_model.pt
+/CNNs/__pycache__
