@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-class ShallowCNN(nn.Module):
+class BatchNormCNN(nn.Module):
     def __init__(self):
         super().__init__()
 
