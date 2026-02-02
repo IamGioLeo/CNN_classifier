@@ -59,74 +59,65 @@ def crop_image(image_path: str = "dataset/15-Scene Image Dataset/15-Scene/00", t
         print(f"The image {origin_path} doesn't exist")
         return
 
-    rep = random.randint(1,3)
+    augmentation_name_0 = f"crop_0_" + image_name
+    augmented_path_0 = Path(target_path) / augmentation_name_0
+    augmented_path_0.parent.mkdir(parents=True, exist_ok=True)
 
-    for i in range(rep):
-        augmentation_name_0 = f"{i}" + "0000" + image_name
-        augmented_path_0 = Path(target_path) / augmentation_name_0
-        augmented_path_0.parent.mkdir(parents=True, exist_ok=True)
+    # here i decided to do this control only on the frist name and not all 4 
+    # because the operation are done to all 4 names, every time 
+    if augmented_path_0.exists():
+        print(f"An image in {augmented_path_0} already exists")
 
-        # here i decided to do this control only on the frist name and not all 4 
-        # because the operation are done to all 4 names, every time 
+    else:
+        augmentation_name_1 = f"crop_1_" + image_name
+        augmented_path_1 = Path(target_path) / augmentation_name_1
+        augmented_path_1.parent.mkdir(parents=True, exist_ok=True)
 
-        if augmented_path_0.exists():
-            print(f"An image in {augmented_path_0} already exists")
+        augmentation_name_2 = f"crop_2_" + image_name
+        augmented_path_2 = Path(target_path) / augmentation_name_2
+        augmented_path_2.parent.mkdir(parents=True, exist_ok=True)
 
-        else:
+        augmentation_name_3 = f"crop_3_" + image_name
+        augmented_path_3 = Path(target_path) / augmentation_name_3
+        augmented_path_3.parent.mkdir(parents=True, exist_ok=True)
 
-            augmentation_name_1 = f"{i}" + "1111" + image_name
-            augmented_path_1 = Path(target_path) / augmentation_name_1
-            augmented_path_1.parent.mkdir(parents=True, exist_ok=True)
+        image = Image.open(origin_path)
+        w, h = image.size
 
-            augmentation_name_2 = f"{i}" + "2222" + image_name
-            augmented_path_2 = Path(target_path) / augmentation_name_2
-            augmented_path_2.parent.mkdir(parents=True, exist_ok=True)
+        # I feel like this is not a proper way of cropping to have more images,  
+        # in this case some parts of the room are always taken in consideration (the center)
+        # others instead are rarely take in consideration
+        top_x_0 = random.randint(0, w//8)
+        top_y_0 = random.randint(0, h//8)
+        bottom_x_0 = random.randint(top_x_0 + w//2, w - top_x_0)
+        bottom_y_0 = random.randint(top_y_0 + h//2, h - top_y_0)
 
-            augmentation_name_3 = f"{i}" + "3333" + image_name
-            augmented_path_3 = Path(target_path) / augmentation_name_3
-            augmented_path_3.parent.mkdir(parents=True, exist_ok=True)
+        bottom_x_1 = random.randint(w - w//8, w)
+        bottom_y_1 = random.randint(h - h//8, h)
+        top_x_1 = random.randint(w-bottom_x_1, bottom_x_1 - w//2)
+        top_y_1 = random.randint(h-bottom_y_1, bottom_y_1 - h//2)
 
-            image = Image.open(origin_path)
+        cropped_image_0 = image.crop((top_x_0, top_y_0, bottom_x_0, bottom_y_0))
+        cropped_image_0 = cropped_image_0.resize((64, 64))
+        cropped_image_0 = cropped_image_0.convert("L")
+        cropped_image_0.save(augmented_path_0)
 
+        cropped_image_1 = image.crop((top_x_1, top_y_0, bottom_x_1, bottom_y_0))
+        cropped_image_1 = cropped_image_1.resize((64, 64))
+        cropped_image_1 = cropped_image_1.convert("L")
+        cropped_image_1.save(augmented_path_1)
 
-            w, h = image.size
+        cropped_image_2 = image.crop((top_x_0, top_y_1, bottom_x_0, bottom_y_1))
+        cropped_image_2 = cropped_image_2.resize((64, 64))
+        cropped_image_2.convert("L")
+        cropped_image_2.save(augmented_path_2)
 
-            # I feel like this is not a proper way of cropping to have more images,  
-            # in this case some parts of the room are always taken in consideration (the center)
-            # others instead are rarely take in consideration
-
-            top_x_0 = random.randint(0, w//8)
-            top_y_0 = random.randint(0, h//8)
-            bottom_x_0 = random.randint(top_x_0 + w//2, w - top_x_0)
-            bottom_y_0 = random.randint(top_y_0 + h//2, h - top_y_0)
-
-            bottom_x_1 = random.randint(w - w//8, w)
-            bottom_y_1 = random.randint(h - h//8, h)
-            top_x_1 = random.randint(w-bottom_x_1, bottom_x_1 - w//2)
-            top_y_1 = random.randint(h-bottom_y_1, bottom_y_1 - h//2)
-
-
-            cropped_image_0 = image.crop((top_x_0, top_y_0, bottom_x_0, bottom_y_0))
-            cropped_image_0 = cropped_image_0.resize((64, 64))
-            cropped_image_0 = cropped_image_0.convert("L")
-            cropped_image_0.save(augmented_path_0)
-
-            cropped_image_1 = image.crop((top_x_1, top_y_0, bottom_x_1, bottom_y_0))
-            cropped_image_1 = cropped_image_1.resize((64, 64))
-            cropped_image_1 = cropped_image_1.convert("L")
-            cropped_image_1.save(augmented_path_1)
-
-            cropped_image_2 = image.crop((top_x_0, top_y_1, bottom_x_0, bottom_y_1))
-            cropped_image_2 = cropped_image_2.resize((64, 64))
-            cropped_image_2.convert("L")
-            cropped_image_2.save(augmented_path_2)
-
-            cropped_image_3 = image.crop((top_x_1, top_y_1, bottom_x_1, bottom_y_1))
-            cropped_image_3 = cropped_image_3.resize((64, 64))
-            cropped_image_3 = cropped_image_3.convert("L")
-            cropped_image_3.save(augmented_path_3)
-            
-            print(f"Image saved to {augmented_path_0}")
+        cropped_image_3 = image.crop((top_x_1, top_y_1, bottom_x_1, bottom_y_1))
+        cropped_image_3 = cropped_image_3.resize((64, 64))
+        cropped_image_3 = cropped_image_3.convert("L")
+        cropped_image_3.save(augmented_path_3)
+        
+        print(f"Image saved to {augmented_path_0}")
 
     return
 
@@ -153,11 +144,11 @@ for dir in base_directory.iterdir():
         resize_image(dir, target_resize_path, img.name)
         crop_image(dir, target_cropping_path, img.name)
 
-resize_path = Path("dataset/resized") 
-for dir in resize_path.iterdir():
-    target_mirror_path = "dataset/augmented/mirror/" + dir.name
-    for img in dir.iterdir():
-        mirror_image(dir, target_mirror_path, img.name)
+#resize_path = Path("dataset/resized") 
+#for dir in resize_path.iterdir():
+#    target_mirror_path = "dataset/augmented/mirror/" + dir.name
+#    for img in dir.iterdir():
+#        mirror_image(dir, target_mirror_path, img.name)
 
 
 
