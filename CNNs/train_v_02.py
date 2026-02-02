@@ -21,13 +21,13 @@ NUM_EPOCHS = [40]
 LEARNING_RATES = [0.001, 0.0001]
 MOMENTUMS = [0.7, 0.9]
 PATIENCES = [3]
-KERNEL_SIZES = [3]#,5,7,9]
-CONV_FILTERS = [[8, 16, 32]] #,[8,16,32,64],[16,32,64]
+KERNEL_SIZES = [3,5,7]
+CONV_FILTERS = [[8, 16, 32],[8,16,32,64],[16,32,64]]
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-net_version = "shallow_net_v_03_mirror"
+net_version = "batch_norm_dropout_conv_filters_v_01_base"
 file_name = f"results/{net_version}_results.txt" #conv_filters_v_01_results.txt"
 output_file = PROJECT_ROOT / file_name
 
@@ -93,15 +93,11 @@ else:
     trainval_size = int(0.85 * len(dataset))
     test_size = len(dataset) - trainval_size
 
-    trainval_set, test_set = torch.utils.data.random_split(
-        dataset, [trainval_size, test_size]
-    )
-
     val_size = int(0.15 * trainval_size)
     train_size = trainval_size - val_size
 
-    train_set, val_set = torch.utils.data.random_split(
-        trainval_set, [train_size, val_size]
+    train_set, test_set, val_set = torch.utils.data.random_split(
+        dataset, [train_size, test_size, val_size]
     )
 
     splits = {
@@ -113,32 +109,32 @@ else:
     torch.save(splits, "dataset_splits.pt")
 
 
-# this will be used later to have a proper augmentation of the dataset
-train_filenames = set()
-
-for idx in train_set.indices:
-    path, _ = dataset.samples[idx]
-    filename = os.path.basename(path)
-    train_filenames.add(filename)
-
-
-
-# mirrror subset for training 
-dataset_2 = datasets.ImageFolder(
-    root="/home/leo/CNN_classifier/dataset/augmented/mirror",
-    transform=transform
-)
-
-mirror_indices = [
-    i for i, (path, _) in enumerate(dataset_2.samples)
-    if os.path.basename(path) in train_filenames
-]
-
-mirror_train_set = Subset(dataset_2, mirror_indices)
-
-train_set = ConcatDataset([train_set, mirror_train_set])
-
-
+## this will be used later to have a proper augmentation of the dataset
+#train_filenames = set()
+#
+#for idx in train_set.indices:
+#    path, _ = dataset.samples[idx]
+#    filename = os.path.basename(path)
+#    train_filenames.add(filename)
+#
+#
+#
+## mirrror subset for training 
+#dataset_2 = datasets.ImageFolder(
+#    root="/home/leo/CNN_classifier/dataset/augmented/mirror",
+#    transform=transform
+#)
+#
+#mirror_indices = [
+#    i for i, (path, _) in enumerate(dataset_2.samples)
+#    if os.path.basename(path) in train_filenames
+#]
+#
+#mirror_train_set = Subset(dataset_2, mirror_indices)
+#
+#train_set = ConcatDataset([train_set, mirror_train_set])
+#
+#
 #
 ## agmented subset for training
 #dataset_3 = datasets.ImageFolder(
@@ -201,7 +197,7 @@ for lr in LEARNING_RATES:
                         print("\n" + "-"*100)
                         print(f"Training with LEARNING_RATE={lr}, MOMENTUM={momentum}, EPOCHS={epochs}, PATIENCE={patience}, KERNEL_SIZES={kernel_size}, CONV_FILTERS={conv_filters}")
         
-                        model = ResizedConvFilterCNN().to(device)
+                        model = ResizedConvFilterCNN(kernel_size=kernel_size, list_out_channels=conv_filters, batch_norm=True, dropout=True).to(device)
                         criterion = nn.CrossEntropyLoss()
         
                         optimizer = optim.SGD(
