@@ -4,7 +4,9 @@ CVPR_2025__Projects_assignments.pdf
 /__pycache__
 /venv_CVPR_project
 /curves
-/confusion_matrixes
+/confusion_matrices
 /parameters_experimental_results
 best_model.pt
 /CNNs/__pycache__
+dataset_splits.pt
+/results
