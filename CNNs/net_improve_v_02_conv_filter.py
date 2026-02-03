@@ -2,7 +2,7 @@ import torch.nn as nn
 import numpy as np
 
 class ResizedConvFilterCNN(nn.Module):
-    def __init__(self, kernel_size: int = 3, list_out_channels = [8, 16, 32], batch_norm = False, dropout = False, dropout_p = 0.5):
+    def __init__(self, kernel_size: int = 3, list_out_channels = [8, 16, 32], batch_norm = False, dropout_p = None):
         super().__init__()
 
         if kernel_size not in [3,5,7,9]:
@@ -25,7 +25,7 @@ class ResizedConvFilterCNN(nn.Module):
 
             block.append(nn.ReLU())
 
-            if dropout:
+            if dropout_p is not None:
                 block.append(nn.Dropout2d())
 
             if i <= 3 and i < (len(list_out_channels) - 1):
@@ -38,7 +38,7 @@ class ResizedConvFilterCNN(nn.Module):
 
         self.features = nn.Sequential(*layers)
 
-        if dropout:
+        if dropout_p is not None:
             self.classifier = nn.Sequential(
                 nn.Dropout(dropout_p),
                 nn.Linear(input_side_length * input_side_length * list_out_channels[-1], 15)
