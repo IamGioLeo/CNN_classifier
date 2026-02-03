@@ -40,6 +40,9 @@ curves_dir.mkdir(parents=True, exist_ok=True)
 cm_dir = PROJECT_ROOT / "confusion_matrices"
 cm_dir.mkdir(parents=True, exist_ok=True)
 
+dataset_dir = PROJECT_ROOT / "dataset"
+
+
 
 class_codes = [
     "00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14"
@@ -69,8 +72,9 @@ transform = transforms.Compose([
 ])
 
 
+base_dir = dataset_dir / "resized"
 dataset = datasets.ImageFolder(
-    root="./dataset/resized",
+    root=base_dir,
     transform=transform
 )
 
@@ -124,19 +128,19 @@ for idx in train_set.indices:
 
 
 # mirrror subset for training 
-dataset_2 = datasets.ImageFolder(
-    root="/home/leo/CNN_classifier/dataset/augmented/mirror",
-    transform=transform
-)
-
-mirror_indices = [
-    i for i, (path, _) in enumerate(dataset_2.samples)
-    if os.path.basename(path) in train_filenames
-]
-
-mirror_train_set = Subset(dataset_2, mirror_indices)
-
-train_set = ConcatDataset([train_set, mirror_train_set])
+#dataset_2 = datasets.ImageFolder(
+#    root="/home/leo/CNN_classifier/dataset/augmented/mirror",
+#    transform=transform
+#)
+#
+#mirror_indices = [
+#    i for i, (path, _) in enumerate(dataset_2.samples)
+#    if os.path.basename(path) in train_filenames
+#]
+#
+#mirror_train_set = Subset(dataset_2, mirror_indices)
+#
+#train_set = ConcatDataset([train_set, mirror_train_set])
 
 
 #
