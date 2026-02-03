@@ -125,6 +125,7 @@ def train(kernel_size, conv_filters, batch_norm, dropout_p, train_loader, val_lo
                 break
         
     return {
+        model,
         train_losses,
         val_losses,
         train_accs,
@@ -179,6 +180,9 @@ curves_dir.mkdir(parents=True, exist_ok=True)
 cm_dir = PROJECT_ROOT / "confusion_matrices"
 cm_dir.mkdir(parents=True, exist_ok=True)
 
+dataset_dir = PROJECT_ROOT / "dataset"
+
+
 
 class_codes = [
     "00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14"
@@ -207,9 +211,9 @@ transform = transforms.Compose([
     transforms.Lambda(lambda x: x - 128)
 ])
 
-
+base_dir = dataset_dir / "resized"
 dataset = datasets.ImageFolder(
-    root="./dataset/resized",
+    root=base_dir,
     transform=transform
 )
 
@@ -258,9 +262,10 @@ if DATA_AUGMENTATION == "m" or DATA_AUGMENTATION == "a":
         filename = os.path.basename(path)
         train_filenames.add(filename)
 
-    # mirrror subset for training 
+    # mirrror subset for training
+    mirror_dir = dataset_dir / "augmented/mirror"
     dataset_2 = datasets.ImageFolder(
-        root="/home/leo/CNN_classifier/dataset/augmented/mirror",
+        root=mirror_dir,
         transform=transform
     )
 
@@ -278,8 +283,9 @@ if DATA_AUGMENTATION == "a":
     # agmented subset for training
     print("Adding cropped images to training set")
 
+    cropped_dir = dataset_dir / "augmented/cropping"
     dataset_3 = datasets.ImageFolder(
-        root="/home/leo/CNN_classifier/dataset/augmented/cropping",
+        root=cropped_dir,
         transform=transform
     )
 
@@ -341,6 +347,21 @@ for values in product(*GRID.values()):
         f.write(f"\r\nTraining with LEARNING_RATE={lr}, MOMENTUM={momentum}, EPOCHS={epochs}, PATIENCE={patience}, KERNEL_SIZES={kernel_size}, CONV_FILTERS={conv_filters}")
     print("\n" + "-"*100)
     print(f"Training with LEARNING_RATE={lr}, MOMENTUM={momentum}, EPOCHS={epochs}, PATIENCE={patience}, KERNEL_SIZES={kernel_size}, CONV_FILTERS={conv_filters}")
+
+    model, train_losses, val_losses, train_accs, val_accs, global_correct, global_total, best_val_acc, best_val_loss, best_val_acc_epoch = train(
+        kernel_size,
+        conv_filters,
+        BATCH_NORM,
+        DROPOUT,
+        train_loader,
+        val_loader,
+        epochs, patience,
+        OPTIMIZER,
+        lr,
+        momentum,
+        WEIGHT_DECAY,
+        False
+    )
 
     #insert_in_csv(k_size=kernel_size,conv_fil=conv_filters, 
     #                  lr=lr, opt=optimizer, m=momentum, wd=weight_decay, p=patience,
