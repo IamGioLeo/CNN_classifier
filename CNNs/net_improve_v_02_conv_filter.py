@@ -2,7 +2,7 @@ import torch.nn as nn
 import numpy as np
 
 class ResizedConvFilterCNN(nn.Module):
-    def __init__(self, kernel_size: int = 3, list_out_channels = [8, 16, 32]):
+    def __init__(self, kernel_size: int = 3, list_out_channels = [8, 16, 32], batch_norm = False, dropout_p = None):
         super().__init__()
 
         if kernel_size not in [3,5,7,9]:
@@ -18,24 +18,33 @@ class ResizedConvFilterCNN(nn.Module):
         input_side_length: int = 64
 
         for i, out_channels in enumerate(list_out_channels):
+            block = [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=1, padding=padding)]
+            
+            if batch_norm:
+                block.append(nn.BatchNorm2d(out_channels))
+
+            block.append(nn.ReLU())
+
+            if dropout_p is not None:
+                block.append(nn.Dropout2d())
+
             if i <= 3 and i < (len(list_out_channels) - 1):
-                layers.extend([
-                    nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=1, padding=padding),
-                    nn.ReLU(),
-                    nn.MaxPool2d(2, 2)
-                ])
+                block.append(nn.MaxPool2d(2, 2))
                 input_side_length //= 2
-            else:
-                layers.extend([
-                    nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=1, padding=padding),
-                    nn.ReLU()
-                ])
+            
+            layers.extend(block)
 
             in_channels = out_channels
 
         self.features = nn.Sequential(*layers)
 
-        self.classifier = nn.Linear(input_side_length * input_side_length * int(list_out_channels[-1]), 15)
+        if dropout_p is not None:
+            self.classifier = nn.Sequential(
+                nn.Dropout(dropout_p),
+                nn.Linear(input_side_length * input_side_length * list_out_channels[-1], 15)
+            )
+        else:
+            self.classifier = nn.Linear(input_side_length * input_side_length * list_out_channels[-1], 15)
 
         self._initialize_weights()
 
