@@ -13,7 +13,6 @@ from pathlib import Path
 import random
 
 from itertools import product
-from net_improve import ResizedConvFilterCNN
 from csv_functions import insert_all_rows_in_csv, insert_in_csv
 from train_function import train
 
@@ -24,62 +23,41 @@ print(f"Using device: {device}")
 
 
 LEARNING_RATES = [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
-MOMENTUMS = [0.0, 0.9, 0.9, 0.9, 0.9]
-WEIGHT_DECAY = [0.0, 0.0, 0.0, 0.0001, 0.00001]
-PATIENCES = [3, 3, 3, 5, 5]
-KERNEL_SIZES = [3, 3, 3, 5, 5] 
-CONV_FILTERS = [[8,16,32],[16, 32, 64],[32,64,128],[64,128,256],[16,32,64,128]]
+MOMENTUMS = [0.0, 0.0, 0.0, 0.0, 0.0]
+WEIGHT_DECAY = [0.0, 0.0, 0.0, 0.0, 0.0]
+PATIENCES = [3, 3, 3, 3, 3]
+KERNEL_SIZES = [3, 3, 3, 3, 3] 
+CONV_FILTERS = [[8,16,32],[8,16,32],[8,16,32],[8,16,32],[8,16,32]]
 OPTIMIZER = "SDG"
-BATCH_NORM = True 
-DROPOUT_P = 0.2
+BATCH_NORM = False 
+DROPOUT_P = None
 BATCH_SIZE = 32
 NUM_EPOCHS = 40
 DATA_SPLIT_VERSION = "dataset_splits.pt"
 DATA_AUGMENTATION = "b" #"b" for the base dataset, "m" to add the mirrored images, "a" to add augmentation
-NET_VERSION = "test_ensemble_v3_" + DATA_AUGMENTATION
-CSV_NAME = "test_ensemble_v3.csv"
+NET_VERSION = "ensamble_shallow_" + DATA_AUGMENTATION
+CSV_NAME = "ensamble_final.csv"
 NUM_ENSEMBLE = 5
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-file_name = f"results/{NET_VERSION}_results.txt" #conv_filters_v_01_results.txt"
-output_file = PROJECT_ROOT / file_name
-
-output_dir = PROJECT_ROOT / "results"
+output_dir = PROJECT_ROOT / "results/final"
 output_dir.mkdir(parents=True, exist_ok=True)
 
-curves_dir = PROJECT_ROOT / "curves"
+file_name = f"{NET_VERSION}_results.txt" 
+output_file = output_dir / file_name
+
+curves_dir = PROJECT_ROOT / "curves/final"
 curves_dir.mkdir(parents=True, exist_ok=True)
 
-cm_dir = PROJECT_ROOT / "confusion_matrices"
+cm_dir = PROJECT_ROOT / "confusion_matrices/final"
 cm_dir.mkdir(parents=True, exist_ok=True)
 
 dataset_dir = PROJECT_ROOT / "dataset"
 
 
-
-class_codes = [
-    "00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14"
-]
-label_map = {
-    "00": "bedroom",
-    "01": "suburb",
-    "02": "industrial",
-    "03": "kitchen",
-    "04": "living_room",
-    "05": "coast",
-    "06": "forest",
-    "07": "highway",
-    "08": "inside_city",
-    "09": "mountain",
-    "10": "open country",
-    "11": "street",
-    "12": "tall building",
-    "13": "office",
-    "14": "store"
-}
 
 transform = transforms.Compose([
     transforms.Grayscale(num_output_channels=1),
@@ -87,7 +65,13 @@ transform = transforms.Compose([
     transforms.Lambda(lambda x: x - 128)
 ])
 
-base_dir = dataset_dir / "resized"
+test_dir = dataset_dir / "resized/test"
+test_set = datasets.ImageFolder(
+    root=test_dir,
+    transform=transform
+)
+
+base_dir = dataset_dir / "resized/train"
 dataset = datasets.ImageFolder(
     root=base_dir,
     transform=transform
@@ -104,25 +88,21 @@ if os.path.exists(splits_path):
 
     train_set = Subset(dataset, splits["train"])
     val_set   = Subset(dataset, splits["val"])
-    test_set  = Subset(dataset, splits["test"])
 
 else:
     print("\r\nCreating new Train-Val-Test division")
 
-    trainval_size = int(0.85 * len(dataset))
-    test_size = len(dataset) - trainval_size
+    train_size = int(0.85 * len(dataset))
+    val_size = len(dataset) - train_size
 
-    val_size = int(0.15 * trainval_size)
-    train_size = trainval_size - val_size
 
-    train_set, test_set, val_set = torch.utils.data.random_split(
-        dataset, [train_size, test_size, val_size]
+    train_set, val_set = torch.utils.data.random_split(
+        dataset, [train_size, val_size]
     )
 
     splits = {
         "train": train_set.indices,
-        "val": val_set.indices,
-        "test": test_set.indices
+        "val": val_set.indices
     }
 
     torch.save(splits, DATA_SPLIT_VERSION)
@@ -270,10 +250,11 @@ for lr, momentum, wd, patience, kernel_size, conv_filters in zip(LEARNING_RATES,
                 te_acc=model_test_accuracy, data_v=DATA_SPLIT_VERSION,
                 data_aug=DATA_AUGMENTATION, csv_name=CSV_NAME)
     
+    class_names =  dataset.classes
+
     cm = confusion_matrix(
         model_labels,
         model_preds,
-        labels=np.arange(len(class_codes))
     )
 
     global_accuracy = global_correct / global_total * 100
@@ -293,10 +274,10 @@ for lr, momentum, wd, patience, kernel_size, conv_filters in zip(LEARNING_RATES,
             f.write(line + "\n")
 
 
-# fixare sta roba
-    class_names = [label_map[c] for c in class_codes]
-    num_classes = len(class_names)
-    ticks = np.arange(num_classes)
+
+
+    class_names = dataset.classes
+
     fig, ax = plt.subplots(figsize=(12, 10))
     sns.heatmap(
         cm,
@@ -314,13 +295,15 @@ for lr, momentum, wd, patience, kernel_size, conv_filters in zip(LEARNING_RATES,
     ax.set_xlabel("Predicted label")
     ax.set_ylabel("True label")
     fig.tight_layout()
-    matrix_name = f"confusion_matrices/confusion_matrix_model_id_{model_id}_ensamble_id_{ensemble_id}.png"
+    matrix_name = f"confusion_matrix_model_id_{model_id}_ensamble_id_{ensemble_id}.png"
     fig.savefig(
-        PROJECT_ROOT / matrix_name,
+        cm_dir / matrix_name,
         dpi=300,
         bbox_inches="tight"
     )
     plt.close(fig)
+
+
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
     # Loss
@@ -372,8 +355,8 @@ for lr, momentum, wd, patience, kernel_size, conv_filters in zip(LEARNING_RATES,
     axes[1].legend()
     fig.tight_layout()
     
-    fig_name = f"curves/curves_model_id_{model_id}_ensamble_id_{ensemble_id}.png"
-    fig.savefig(PROJECT_ROOT / fig_name, dpi=300, bbox_inches="tight")
+    fig_name = f"curves_model_id_{model_id}_ensamble_id_{ensemble_id}.png"
+    fig.savefig(curves_dir / fig_name, dpi=300, bbox_inches="tight")
     plt.close(fig)
 
     ensemble.append(model)
@@ -409,7 +392,6 @@ test_accuracy = (all_preds == all_labels).mean() * 100
 cm = confusion_matrix(
     all_labels,
     all_preds,
-    labels=np.arange(len(class_codes))
 )
 
 ensemble_global_accuracy = ensemble_global_correct / ensemble_global_total *100
@@ -432,10 +414,8 @@ insert_in_csv(id=ensemble_id, k_size=kernel_size,conv_fil=conv_filters,
             te_acc=test_accuracy, data_v=DATA_SPLIT_VERSION,
             data_aug=DATA_AUGMENTATION, csv_name=CSV_NAME)
 
-# fixare sta roba
-class_names = [label_map[c] for c in class_codes]
-num_classes = len(class_names)
-ticks = np.arange(num_classes)
+class_names = dataset.classes
+
 fig, ax = plt.subplots(figsize=(12, 10))
 sns.heatmap(
     cm,
@@ -453,9 +433,9 @@ ax.set_title("Confusion Matrix")
 ax.set_xlabel("Predicted label")
 ax.set_ylabel("True label")
 fig.tight_layout()
-matrix_name = f"confusion_matrices/confusion_matrix_ensamble_id_{ensemble_id}.png"
+matrix_name = f"confusion_matrix_ensamble_id_{ensemble_id}.png"
 fig.savefig(
-    PROJECT_ROOT / matrix_name,
+    cm_dir / matrix_name,
     dpi=300,
     bbox_inches="tight"
 )
