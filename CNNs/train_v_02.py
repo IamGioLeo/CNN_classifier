@@ -12,7 +12,7 @@ import seaborn as sns
 from pathlib import Path
 
 from itertools import product
-from net_improve_v_02_conv_filter import ResizedConvFilterCNN
+from net_improve import ResizedConvFilterCNN
 from csv_functions import insert_in_csv
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

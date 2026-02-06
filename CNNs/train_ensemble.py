@@ -10,160 +10,36 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
 import seaborn as sns
 from pathlib import Path
+import random
 
 from itertools import product
-from net_improve_v_02_conv_filter import ResizedConvFilterCNN
-from csv_functions import insert_in_csv
+from net_improve import ResizedConvFilterCNN
+from csv_functions import insert_all_rows_in_csv, insert_in_csv
+from train_function import train
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-def train(kernel_size, conv_filters, batch_norm, dropout_p, train_loader, val_loader, epochs, patience, optimizer, lr, momentum, weight_decay, no_improve_break):
 
-    model = ResizedConvFilterCNN(kernel_size=kernel_size, list_out_channels=conv_filters, batch_norm=batch_norm, dropout_p=dropout_p).to(device)
 
-    criterion = nn.CrossEntropyLoss()
-
-    if OPTIMIZER == "SDG":
-        optimizer = optim.SGD(
-            model.parameters(),
-            lr=lr,
-            momentum=momentum,
-            wd=weight_decay
-        )
-    else:
-        optimizer = optim.Adam(
-            model.parameters(),
-            lr=lr,
-            wd=weight_decay
-        )
-
-    train_losses, val_losses = [], []
-    train_accs, val_accs = [], []
-    global_correct = 0
-    global_total = 0
-    best_val_acc = 0
-    best_val_loss = float('inf')
-    epochs_no_improve = 0
-    patience_trigger = False
-    best_val_acc_epoch = 0
-
-    for epoch in range(epochs):
-        
-        running_loss = 0.0
-        correct = 0
-        total = 0
-
-        for images, labels in train_loader:
-            images, labels = images.to(device), labels.to(device)
-            optimizer.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
-            _, predicted = torch.max(outputs, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
-
-        train_loss = running_loss / len(train_loader)
-        train_acc = correct / total * 100
-        train_losses.append(train_loss)
-        train_accs.append(train_acc)
-        model.eval()
-        running_loss = 0.0
-        correct = 0
-        total = 0
-
-        with torch.no_grad():
-            for images, labels in val_loader:
-                images, labels = images.to(device), labels.to(device)
-                outputs = model(images)
-                loss = criterion(outputs, labels)
-                running_loss += loss.item()
-                _, predicted = torch.max(outputs, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
-                global_correct += (predicted == labels).sum().item()
-                global_total += labels.size(0)
-
-        val_loss = running_loss / len(val_loader)
-        val_acc = correct / total * 100
-        val_losses.append(val_loss)
-        val_accs.append(val_acc)
-
-        with open(output_file, "a") as f:
-            for line in [
-                f"\r\nEpoch [{epoch+1}/{epochs}] | "
-                f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
-                f"Val Loss {val_loss:.4f} | Val Acc: {val_acc:.2f}%"
-            ]:
-                f.write(line)
-        print(
-            f"Epoch [{epoch+1}/{epochs}] | "
-            f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
-            f"Val Loss {val_loss:.4f} | Val Acc: {val_acc:.2f}%"
-        )
-
-        if not patience_trigger and val_acc > best_val_acc:
-            best_val_acc = val_acc
-            best_val_acc_epoch = epoch
-            torch.save(model.state_dict(), "best_model.pt")
-
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            epochs_no_improve = 0
-        else:
-            epochs_no_improve += 1
-
-        if epochs_no_improve >= patience and not patience_trigger:
-            patience_trigger = True
-            with open(output_file, "a") as f:
-                f.write("\r\nEarly stopping triggered\n")
-            print("Early stopping triggered")
-            if no_improve_break:
-                break
-        
-    return {
-        model,
-        train_losses,
-        val_losses,
-        train_accs,
-        val_accs,
-        global_correct,
-        global_total,
-        best_val_acc,
-        best_val_loss,
-        best_val_acc_epoch
-    }
-
+LEARNING_RATES = [0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+MOMENTUMS = [0.0, 0.9, 0.9, 0.9, 0.9]
+WEIGHT_DECAY = [0.0, 0.0, 0.0, 0.0001, 0.00001]
+PATIENCES = [3, 3, 3, 5, 5]
+KERNEL_SIZES = [3, 3, 3, 5, 5] 
+CONV_FILTERS = [[8,16,32],[16, 32, 64],[32,64,128],[64,128,256],[16,32,64,128]]
+OPTIMIZER = "SDG"
+BATCH_NORM = True 
+DROPOUT_P = 0.2
 BATCH_SIZE = 32
-NUM_EPOCHS = [40]
-LEARNING_RATES = [0.0001]
-MOMENTUMS = [0.9]
-PATIENCES = [3]
-KERNEL_SIZES = [3, 5, 7]
-CONV_FILTERS = [[16, 32, 64, 128],[8, 16, 32, 64],[16, 32, 64]]
-BATCH_NORM = False
-DROPOUT = None
-OPTIMIZER = "SDG" # alternatevely: "Adam"
-WEIGHT_DECAY = [0.0, 1e-3, 1e-4, 1e-5]
+NUM_EPOCHS = 40
 DATA_SPLIT_VERSION = "dataset_splits.pt"
-DATA_AUGMENTATION = "a" #"b" for the base dataset, "m" to add the mirrored images, "a" to add augmentation
-NET_VERSION = "conv_filters_v_01_" + DATA_AUGMENTATION
-CSV_NAME = "csv_v1.csv"
+DATA_AUGMENTATION = "b" #"b" for the base dataset, "m" to add the mirrored images, "a" to add augmentation
+NET_VERSION = "test_ensemble_v3_" + DATA_AUGMENTATION
+CSV_NAME = "test_ensemble_v3.csv"
 NUM_ENSEMBLE = 5
 
-GRID = {
-    "lr": LEARNING_RATES,
-    "momentum": MOMENTUMS,
-    "weight_decay": WEIGHT_DECAY,
-    "epochs": NUM_EPOCHS,
-    "patience": PATIENCES,
-    "kernel_size": KERNEL_SIZES,
-    "conv_filters": CONV_FILTERS,
-    "n_ensemble_models": NUM_ENSEMBLE
-}
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -325,60 +201,53 @@ sns.set_theme(
 )
 
 
+ensemble=[]
+ensemble_id = random.randint(1,999999999)
+ensemble_global_accuracy = 0
+ensemble_global_total = 0
+ensemble_global_correct = 0
+
 with open(output_file, "a") as f:
-    f.write("\r\n\nNEW TRIANING SESSION")
-print("\r\n\nNEW TRIANING SESSION")
+    f.write("\r\n" + "-"*100)
+    f.write(f"\r\nStarting new ensmeble of network training session, id = {ensemble_id}")
+print("\n" + "-"*100)
+print(f"Starting new ensmeble of network training session, id = {ensemble_id}")
 
 
-for values in product(*GRID.values()):
-    params = dict(zip(GRID.keys(), values))
+for lr, momentum, wd, patience, kernel_size, conv_filters in zip(LEARNING_RATES, MOMENTUMS, WEIGHT_DECAY, PATIENCES, KERNEL_SIZES, CONV_FILTERS):
 
-    lr = params["lr"]
-    momentum = params["momentum"]
-    wd = params["weight_decay"]
-    epochs = params["epochs"]
-    patience = params["patience"]
-    kernel_size = params["kernel_size"]
-    conv_filters = params["conv_filters"]
-    n_ensemble_models = params["n_ensemble_models"]
+    model_id = random.randint(1,999999999)
 
     with open(output_file, "a") as f:
         f.write("\r\n" + "-"*100)
-        f.write(f"\r\nTraining with LEARNING_RATE={lr}, MOMENTUM={momentum}, EPOCHS={epochs}, PATIENCE={patience}, KERNEL_SIZES={kernel_size}, CONV_FILTERS={conv_filters}")
+        f.write(f"\r\nTraining with LEARNING_RATE={lr}, WEIGHT_DECAY={wd}, MOMENTUM={momentum}, PATIENCE={patience}, KERNEL_SIZES={kernel_size}, CONV_FILTERS={conv_filters}")
     print("\n" + "-"*100)
-    print(f"Training with LEARNING_RATE={lr}, MOMENTUM={momentum}, EPOCHS={epochs}, PATIENCE={patience}, KERNEL_SIZES={kernel_size}, CONV_FILTERS={conv_filters}")
+    print(f"Training with LEARNING_RATE={lr}, WEIGHT_DECAY={wd}, MOMENTUM={momentum}, PATIENCE={patience}, KERNEL_SIZES={kernel_size}, CONV_FILTERS={conv_filters}")
+
 
     model, train_losses, val_losses, train_accs, val_accs, global_correct, global_total, best_val_acc, best_val_loss, best_val_acc_epoch = train(
-        kernel_size,
-        conv_filters,
-        BATCH_NORM,
-        DROPOUT,
-        train_loader,
-        val_loader,
-        epochs, patience,
-        OPTIMIZER,
-        lr,
-        momentum,
-        WEIGHT_DECAY,
-        False
+        device=device,
+        output_file=output_file,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        epochs=NUM_EPOCHS,
+        patience=patience,
+        optimizer=OPTIMIZER,
+        lr=lr,
+        momentum=momentum,
+        weight_decay=wd,
+        no_improve_break=False,
+        kernel_size=kernel_size,
+        conv_filters=conv_filters,
+        batch_norm=BATCH_NORM,
+        dropout_p=DROPOUT_P
     )
 
-    #insert_in_csv(k_size=kernel_size,conv_fil=conv_filters, 
-    #                  lr=lr, opt=optimizer, m=momentum, wd=weight_decay, p=patience,
-    #                  b_size=BATCH_SIZE, epochs=epochs, epoch=epoch, b_norm=batch_norm, 
-    #                  d_out=dropout_p, ens=None, v_l=val_loss, tr_l=train_loss,
-    #                  v_acc=val_acc, tr_acc=train_acc, data_v=DATA_SPLIT_VERSION,
-    #                  data_aug=DATA_AUGMENTATION, csv_name=CSV_NAME)
-
-    # for i, model in enumerate(ensemble):
-    #     print(f"Training model {i+1}/{num_models}")
-    #     train(model, optimizers[i], )
-
-    model.load_state_dict(torch.load("best_model.pt", map_location=device))
     model.eval()
 
-    all_preds = []
-    all_labels = []
+
+    model_preds = []
+    model_labels = []
 
     with torch.no_grad():
         for images, labels in test_loader:
@@ -386,25 +255,36 @@ for values in product(*GRID.values()):
             labels = labels.to(device)
             outputs = model(images)
             _, predicted = torch.max(outputs, 1)
-            all_preds.append(predicted.cpu())
-            all_labels.append(labels.cpu())
+            model_preds.append(predicted.cpu())
+            model_labels.append(labels.cpu())
 
-    all_preds = torch.cat(all_preds).numpy()
-    all_labels = torch.cat(all_labels).numpy()
-    test_accuracy = (all_preds == all_labels).mean() * 100
+    model_preds = torch.cat(model_preds).numpy()
+    model_labels = torch.cat(model_labels).numpy()
+    model_test_accuracy = (model_preds == model_labels).mean() * 100
 
+    insert_all_rows_in_csv(id=model_id, k_size=kernel_size,conv_fil=conv_filters, 
+                lr=lr, opt=OPTIMIZER, m=momentum, wd=wd, p=patience,
+                b_size=BATCH_SIZE, epochs=NUM_EPOCHS, epoch=best_val_acc_epoch, 
+                b_norm=BATCH_NORM, d_out=DROPOUT_P, ens=ensemble_id, v_ls=val_losses,
+                tr_ls= train_losses, v_accs=val_accs, tr_accs=train_accs,
+                te_acc=model_test_accuracy, data_v=DATA_SPLIT_VERSION,
+                data_aug=DATA_AUGMENTATION, csv_name=CSV_NAME)
+    
     cm = confusion_matrix(
-        all_labels,
-        all_preds,
+        model_labels,
+        model_preds,
         labels=np.arange(len(class_codes))
     )
 
     global_accuracy = global_correct / global_total * 100
 
+    ensemble_global_correct += global_correct
+    ensemble_global_total += global_total
+
     with open(output_file, "a") as f:
         for line in [
             f"\r\nGLOBAL ACCURACY | LR={lr}, Momentum={momentum} | Accuracy: {global_accuracy:.2f}%",
-            f"TEST ACCURACY | LR={lr}, Momentum={momentum} | Accuracy: {test_accuracy:.2f}%",
+            f"TEST ACCURACY | LR={lr}, Momentum={momentum} | Accuracy: {model_test_accuracy:.2f}%",
             "Confusion Matrix:",
             str(cm),
             "-"*50
@@ -412,13 +292,8 @@ for values in product(*GRID.values()):
             print(line)
             f.write(line + "\n")
 
-    insert_in_csv(k_size=kernel_size,conv_fil=conv_filters, 
-                  lr=lr, opt=OPTIMIZER, m=momentum, wd=None, p=patience,
-                  b_size=BATCH_SIZE, epochs=epochs, epoch=best_val_acc_epoch, 
-                  b_norm=BATCH_NORM, d_out=DROPOUT, ens=None, 
-                  te_acc=test_accuracy, data_v=DATA_SPLIT_VERSION,
-                  data_aug=DATA_AUGMENTATION, csv_name=CSV_NAME)
-            
+
+# fixare sta roba
     class_names = [label_map[c] for c in class_codes]
     num_classes = len(class_names)
     ticks = np.arange(num_classes)
@@ -439,7 +314,7 @@ for values in product(*GRID.values()):
     ax.set_xlabel("Predicted label")
     ax.set_ylabel("True label")
     fig.tight_layout()
-    matrix_name = f"confusion_matrices/{NET_VERSION}_confusion_matrix_lr_{lr}_m_{momentum}_e_{epochs}_p_{patience}_ks_{kernel_size}_cf_{conv_filters}.png"
+    matrix_name = f"confusion_matrices/confusion_matrix_model_id_{model_id}_ensamble_id_{ensemble_id}.png"
     fig.savefig(
         PROJECT_ROOT / matrix_name,
         dpi=300,
@@ -485,7 +360,7 @@ for values in product(*GRID.values()):
     # Test accuracy point
     axes[1].scatter(
         best_val_acc_epoch,
-        test_accuracy,
+        model_test_accuracy,
         color="red",
         s=80,
         zorder=5,
@@ -497,6 +372,91 @@ for values in product(*GRID.values()):
     axes[1].legend()
     fig.tight_layout()
     
-    fig_name = f"curves/{NET_VERSION}_training_curves_lr_{lr}_m_{momentum}_e_{epochs}_p_{patience}_ks_{kernel_size}_cf_{conv_filters}.png"
+    fig_name = f"curves/curves_model_id_{model_id}_ensamble_id_{ensemble_id}.png"
     fig.savefig(PROJECT_ROOT / fig_name, dpi=300, bbox_inches="tight")
     plt.close(fig)
+
+    ensemble.append(model)
+
+
+
+
+all_preds = []
+all_labels = []
+
+with torch.no_grad():
+    for images, labels in test_loader:
+        images = images.to(device)
+        labels = labels.to(device)
+
+        outputs = []
+
+        for model in ensemble:
+            outputs.append(model(images))
+
+        outputs = torch.stack(outputs, dim=0)
+        mean_outputs = outputs.mean(dim=0)
+
+        _, predicted = torch.max(mean_outputs, 1)
+
+        all_preds.append(predicted.cpu())
+        all_labels.append(labels.cpu())
+
+all_preds = torch.cat(all_preds).numpy()
+all_labels = torch.cat(all_labels).numpy()
+test_accuracy = (all_preds == all_labels).mean() * 100
+
+cm = confusion_matrix(
+    all_labels,
+    all_preds,
+    labels=np.arange(len(class_codes))
+)
+
+ensemble_global_accuracy = ensemble_global_correct / ensemble_global_total *100
+
+with open(output_file, "a") as f:
+    for line in [
+        f"\r\nGLOBAL ACCURACY | LRS={lr}, Momentum={momentum} | Accuracy: {ensemble_global_accuracy:.2f}%",
+        f"TEST ACCURACY | LR={lr}, Momentum={momentum} | Accuracy: {test_accuracy:.2f}%",
+        "Confusion Matrix:",
+        str(cm),
+        "-"*50
+    ]:
+        print(line)
+        f.write(line + "\n")
+
+insert_in_csv(id=ensemble_id, k_size=kernel_size,conv_fil=conv_filters, 
+            lr=lr, opt=OPTIMIZER, m=momentum, wd=wd, p=patience,
+            b_size=BATCH_SIZE, epochs=NUM_EPOCHS, epoch=best_val_acc_epoch, 
+            b_norm=BATCH_NORM, d_out=DROPOUT_P, ens=NUM_ENSEMBLE, 
+            te_acc=test_accuracy, data_v=DATA_SPLIT_VERSION,
+            data_aug=DATA_AUGMENTATION, csv_name=CSV_NAME)
+
+# fixare sta roba
+class_names = [label_map[c] for c in class_codes]
+num_classes = len(class_names)
+ticks = np.arange(num_classes)
+fig, ax = plt.subplots(figsize=(12, 10))
+sns.heatmap(
+    cm,
+    annot=True,
+    fmt="d",
+    cmap="Blues",
+    cbar=True,
+    xticklabels=class_names,
+    yticklabels=class_names,
+    linewidths=0.5,
+    square=True,
+    ax=ax
+)
+ax.set_title("Confusion Matrix")
+ax.set_xlabel("Predicted label")
+ax.set_ylabel("True label")
+fig.tight_layout()
+matrix_name = f"confusion_matrices/confusion_matrix_ensamble_id_{ensemble_id}.png"
+fig.savefig(
+    PROJECT_ROOT / matrix_name,
+    dpi=300,
+    bbox_inches="tight"
+)
+plt.close(fig)

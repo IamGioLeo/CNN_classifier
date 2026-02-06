@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from net_improve_v_02_conv_filter import ResizedConvFilterCNN
+from net_improve import ResizedConvFilterCNN
 
 
 
