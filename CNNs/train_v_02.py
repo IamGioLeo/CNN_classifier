@@ -13,24 +13,27 @@ from pathlib import Path
 
 from itertools import product
 from net_improve import ResizedConvFilterCNN
-from csv_functions import insert_in_csv
+from csv_functions import insert_all_rows_in_csv
+from train_function import train
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-BATCH_SIZE = 48
+BATCH_SIZE = 32
 NUM_EPOCHS = [40]
-LEARNING_RATES = [0.0001]
-MOMENTUMS = [0.9]
+LEARNING_RATES = [0.001]
+MOMENTUMS = [0]
+WEIGHT_DECAY = [0.0]
 PATIENCES = [3]
-KERNEL_SIZES = [3,5,7]
-CONV_FILTERS = [[16, 32, 64, 128],[8,16,32,64],[16,32,64]]
+KERNEL_SIZES = [3]
+CONV_FILTERS = [[8,16,32]]
+OPTIMIZER = "SDG"
 BATCH_NORM = False
-DROPOUT = None
+DROPOUT_P = [None]
 DATA_SPLIT_VERSION = "dataset_splits.pt"
-DATA_AUGMENTATION = "a" #"b" for the base dataset, "m" to add the mirrored images, "a" to add augmentation
-NET_VERSION = "conv_filters_v_01_" + DATA_AUGMENTATION
-CSV_NAME = "csv_v1.csv"
+DATA_AUGMENTATION = "b" #"b" for the base dataset, "m" to add the mirrored images, "a" to add augmentation
+NET_VERSION = "shallow_final_" + DATA_AUGMENTATION
+CSV_NAME = "final.csv"
 
 
 GRID = {
@@ -40,47 +43,29 @@ GRID = {
     "patience": PATIENCES,
     "kernel_size": KERNEL_SIZES,
     "conv_filters": CONV_FILTERS,
+    "weight_decay": WEIGHT_DECAY,
+    "dropout_p": DROPOUT_P,
 }
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-file_name = f"results/{NET_VERSION}_results.txt" #conv_filters_v_01_results.txt"
-output_file = PROJECT_ROOT / file_name
 
-output_dir = PROJECT_ROOT / "results"
+output_dir = PROJECT_ROOT / "results/final"
 output_dir.mkdir(parents=True, exist_ok=True)
 
-curves_dir = PROJECT_ROOT / "curves"
+file_name = f"{NET_VERSION}_results.txt" 
+output_file = output_dir / file_name
+
+curves_dir = PROJECT_ROOT / "curves/final"
 curves_dir.mkdir(parents=True, exist_ok=True)
 
-cm_dir = PROJECT_ROOT / "confusion_matrices"
+cm_dir = PROJECT_ROOT / "confusion_matrices/final"
 cm_dir.mkdir(parents=True, exist_ok=True)
 
 dataset_dir = PROJECT_ROOT / "dataset"
 
 
-
-class_codes = [
-    "00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12", "13", "14"
-]
-label_map = {
-    "00": "bedroom",
-    "01": "suburb",
-    "02": "industrial",
-    "03": "kitchen",
-    "04": "living_room",
-    "05": "coast",
-    "06": "forest",
-    "07": "highway",
-    "08": "inside_city",
-    "09": "mountain",
-    "10": "open country",
-    "11": "street",
-    "12": "tall building",
-    "13": "office",
-    "14": "store"
-}
 
 transform = transforms.Compose([
     transforms.Grayscale(num_output_channels=1),
@@ -89,7 +74,13 @@ transform = transforms.Compose([
 ])
 
 
-base_dir = dataset_dir / "resized"
+test_dir = dataset_dir / "resized/test"
+test_set = datasets.ImageFolder(
+    root=test_dir,
+    transform=transform
+)
+
+base_dir = dataset_dir / "resized/train"
 dataset = datasets.ImageFolder(
     root=base_dir,
     transform=transform
@@ -104,27 +95,22 @@ if os.path.exists(splits_path):
 
     splits = torch.load(splits_path)
 
-    train_set = Subset(dataset, splits["train"])
     val_set   = Subset(dataset, splits["val"])
-    test_set  = Subset(dataset, splits["test"])
+    train_set  = Subset(dataset, splits["train"])
 
 else:
     print("\r\nCreating new Train-Val-Test division")
 
-    trainval_size = int(0.85 * len(dataset))
-    test_size = len(dataset) - trainval_size
+    train_size = int(0.85 * len(dataset))
+    val_size = len(dataset) - train_size
 
-    val_size = int(0.15 * trainval_size)
-    train_size = trainval_size - val_size
-
-    train_set, test_set, val_set = torch.utils.data.random_split(
-        dataset, [train_size, test_size, val_size]
+    train_set, val_set = torch.utils.data.random_split(
+        dataset, [train_size, val_size]
     )
 
     splits = {
         "train": train_set.indices,
-        "val": val_set.indices,
-        "test": test_set.indices
+        "val": val_set.indices
     }
 
     torch.save(splits, DATA_SPLIT_VERSION)
@@ -141,8 +127,9 @@ if DATA_AUGMENTATION == "m" or DATA_AUGMENTATION == "a":
         train_filenames.add(filename)
 
     # mirrror subset for training 
+    mirror_dir = dataset_dir / "augmented/mirror"
     dataset_2 = datasets.ImageFolder(
-        root="/home/leo/CNN_classifier/dataset/augmented/mirror",
+        root=mirror_dir,
         transform=transform
     )
 
@@ -160,8 +147,9 @@ if DATA_AUGMENTATION == "a":
     # agmented subset for training
     print("Adding cropped images to training set")
 
+    cropped_dir = dataset_dir / "augmented/cropping"
     dataset_3 = datasets.ImageFolder(
-        root="/home/leo/CNN_classifier/dataset/augmented/cropping",
+        root=cropped_dir,
         transform=transform
     )
 
@@ -193,6 +181,8 @@ test_loader = DataLoader(
     test_set, batch_size=BATCH_SIZE, shuffle=False
 )
 
+print("TRAIN classes:", dataset.class_to_idx)
+print("TEST classes :", test_set.class_to_idx)
 
 sns.set_theme(
     style="whitegrid",
@@ -215,117 +205,31 @@ for values in product(*GRID.values()):
     patience = params["patience"]
     kernel_size = params["kernel_size"]
     conv_filters = params["conv_filters"]
+    wd = params["weight_decay"]
+    dropout_p = params["dropout_p"]
 
     with open(output_file, "a") as f:
         f.write("\r\n" + "-"*100)
         f.write(f"\r\nTraining with LEARNING_RATE={lr}, MOMENTUM={momentum}, EPOCHS={epochs}, PATIENCE={patience}, KERNEL_SIZES={kernel_size}, CONV_FILTERS={conv_filters}")
     print("\n" + "-"*100)
     print(f"Training with LEARNING_RATE={lr}, MOMENTUM={momentum}, EPOCHS={epochs}, PATIENCE={patience}, KERNEL_SIZES={kernel_size}, CONV_FILTERS={conv_filters}")
-    
-    model = ResizedConvFilterCNN(kernel_size=kernel_size, list_out_channels=conv_filters, batch_norm=BATCH_NORM, dropout_p=DROPOUT).to(device)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(
-        model.parameters(),
+    model, train_losses, val_losses, train_accs, val_accs, global_correct, global_total, best_val_acc, best_val_loss, best_val_acc_epoch = train(
+        device=device,
+        output_file=output_file,
+        train_loader=train_loader,
+        val_loader=val_loader,
+        epochs=epochs,
+        patience=patience,
+        optimizer=OPTIMIZER,
         lr=lr,
-        momentum=momentum
+        momentum=momentum,
+        weight_decay=wd,
+        no_improve_break=False,
+        kernel_size=kernel_size,
+        conv_filters=conv_filters,
+        batch_norm=BATCH_NORM,
+        dropout_p=dropout_p
     )
-    ## next try 
-    #optimizer = optim.Adam(model.parameters(), lr=1e-3)
-
-    train_losses, val_losses = [], []
-    train_accs, val_accs = [], []
-    global_correct = 0
-    global_total = 0
-    best_val_acc = 0
-    best_val_loss = float('inf')
-    epochs_no_improve = 0
-    patience_trigger = False
-    best_val_acc_epoch = 0
-
-    for epoch in range(epochs):
-
-        model.train()
-        running_loss = 0.0
-        correct = 0
-        total = 0
-
-        for images, labels in train_loader:
-            images, labels = images.to(device), labels.to(device)
-            optimizer.zero_grad()
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
-            _, predicted = torch.max(outputs, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
-
-        train_loss = running_loss / len(train_loader)
-        train_acc = correct / total * 100
-        train_losses.append(train_loss)
-        train_accs.append(train_acc)
-        model.eval()
-        running_loss = 0.0
-        correct = 0
-        total = 0
-
-        with torch.no_grad():
-            for images, labels in val_loader:
-                images, labels = images.to(device), labels.to(device)
-                outputs = model(images)
-                loss = criterion(outputs, labels)
-                running_loss += loss.item()
-                _, predicted = torch.max(outputs, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
-                global_correct += (predicted == labels).sum().item()
-                global_total += labels.size(0)
-
-        val_loss = running_loss / len(val_loader)
-        val_acc = correct / total * 100
-        val_losses.append(val_loss)
-        val_accs.append(val_acc)
-
-        with open(output_file, "a") as f:
-            for line in [
-                f"\r\nEpoch [{epoch+1}/{epochs}] | "
-                f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
-                f"Val Loss {val_loss:.4f} | Val Acc: {val_acc:.2f}%"
-            ]:
-                f.write(line)
-        print(
-            f"Epoch [{epoch+1}/{epochs}] | "
-            f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
-            f"Val Loss {val_loss:.4f} | Val Acc: {val_acc:.2f}%"
-        )
-
-        if not patience_trigger and val_acc > best_val_acc:
-            best_val_acc = val_acc
-            best_val_acc_epoch = epoch
-            torch.save(model.state_dict(), "best_model.pt")
-
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            epochs_no_improve = 0
-        else:
-            epochs_no_improve += 1
-
-        if epochs_no_improve >= patience and not patience_trigger:
-            patience_trigger = True
-            with open(output_file, "a") as f:
-                f.write("\r\nEarly stopping triggered\n")
-            print("Early stopping triggered")
-            #break
-
-        insert_in_csv(k_size=kernel_size,conv_fil=conv_filters, 
-                      lr=lr, opt="SDG", m=momentum, wd=None, p=patience,
-                      b_size=BATCH_SIZE, epochs=epochs, epoch=epoch, b_norm=BATCH_NORM, 
-                      d_out=DROPOUT, ens=None, v_l=val_loss, tr_l=train_loss,
-                      v_acc=val_acc, tr_acc=train_acc, data_v=DATA_SPLIT_VERSION,
-                      data_aug=DATA_AUGMENTATION, csv_name=CSV_NAME)
-
-    model.load_state_dict(torch.load("best_model.pt", map_location=device))
     model.eval()
 
     all_preds = []
@@ -346,8 +250,7 @@ for values in product(*GRID.values()):
 
     cm = confusion_matrix(
         all_labels,
-        all_preds,
-        labels=np.arange(len(class_codes))
+        all_preds
     )
 
     global_accuracy = global_correct / global_total * 100
@@ -363,16 +266,18 @@ for values in product(*GRID.values()):
             print(line)
             f.write(line + "\n")
 
-    insert_in_csv(k_size=kernel_size,conv_fil=conv_filters, 
-                  lr=lr, opt="SDG", m=momentum, wd=None, p=patience,
-                  b_size=BATCH_SIZE, epochs=epochs, epoch=best_val_acc_epoch, 
-                  b_norm=BATCH_NORM, d_out=DROPOUT, ens=None, 
-                  te_acc=test_accuracy, data_v=DATA_SPLIT_VERSION,
-                  data_aug=DATA_AUGMENTATION, csv_name=CSV_NAME)
+    insert_all_rows_in_csv(k_size=kernel_size,conv_fil=conv_filters, 
+                lr=lr, opt=OPTIMIZER, m=momentum, wd=wd, p=patience,
+                b_size=BATCH_SIZE, epochs=epochs, epoch=best_val_acc_epoch, 
+                b_norm=BATCH_NORM, d_out=dropout_p, v_ls=val_losses,
+                tr_ls= train_losses, v_accs=val_accs, tr_accs=train_accs,
+                te_acc=test_accuracy, data_v=DATA_SPLIT_VERSION,
+                data_aug=DATA_AUGMENTATION, csv_name=CSV_NAME)
             
-    class_names = [label_map[c] for c in class_codes]
-    num_classes = len(class_names)
-    ticks = np.arange(num_classes)
+
+
+    class_names = dataset.classes
+
     fig, ax = plt.subplots(figsize=(12, 10))
     sns.heatmap(
         cm,
@@ -390,13 +295,15 @@ for values in product(*GRID.values()):
     ax.set_xlabel("Predicted label")
     ax.set_ylabel("True label")
     fig.tight_layout()
-    matrix_name = f"confusion_matrices/{NET_VERSION}_confusion_matrix_lr_{lr}_m_{momentum}_e_{epochs}_p_{patience}_ks_{kernel_size}_cf_{conv_filters}.png"
+    matrix_name = f"{NET_VERSION}_confusion_matrix_lr_{lr}_m_{momentum}_e_{epochs}_p_{patience}_ks_{kernel_size}_cf_{conv_filters}.png"
     fig.savefig(
-        PROJECT_ROOT / matrix_name,
+        cm_dir / matrix_name,
         dpi=300,
         bbox_inches="tight"
     )
     plt.close(fig)
+
+
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
     # Loss
@@ -448,6 +355,6 @@ for values in product(*GRID.values()):
     axes[1].legend()
     fig.tight_layout()
     
-    fig_name = f"curves/{NET_VERSION}_training_curves_lr_{lr}_m_{momentum}_e_{epochs}_p_{patience}_ks_{kernel_size}_cf_{conv_filters}.png"
-    fig.savefig(PROJECT_ROOT / fig_name, dpi=300, bbox_inches="tight")
+    fig_name = f"{NET_VERSION}_training_curves_lr_{lr}_m_{momentum}_e_{epochs}_p_{patience}_ks_{kernel_size}_cf_{conv_filters}.png"
+    fig.savefig(curves_dir / fig_name, dpi=300, bbox_inches="tight")
     plt.close(fig)
