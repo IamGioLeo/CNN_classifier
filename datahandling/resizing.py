@@ -133,7 +133,7 @@ def crop_image(image_path: str = "dataset/15-Scene Image Dataset/15-Scene/00", t
 ## prima di usare fare test per vedere se funzionano bene i path:
 #
 base_directory_test = Path("./dataset/test")
-base_directory_train = Path("./dataset/test")
+base_directory_train = Path("./dataset/train")
 
 # test 1
 
@@ -187,8 +187,8 @@ for dir in resize_path.iterdir():
 
 
 ## check grayscale and convert if not 
-path_to_images = Path("dataset/resized/test")
-for dir in path_to_images.iterdir():
+path_to_images_test = Path("dataset/resized/test")
+for dir in path_to_images_test.iterdir():
     if not dir.is_dir():
         continue
     for path_img in dir.iterdir():
