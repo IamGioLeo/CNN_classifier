@@ -26,7 +26,7 @@ class ResizedConvFilterCNN(nn.Module):
             block.append(nn.ReLU())
 
             if dropout_p is not None:
-                block.append(nn.Dropout2d())
+                block.append(nn.Dropout2d(p = dropout_p))
 
             if i <= 3 and i < (len(list_out_channels) - 1):
                 block.append(nn.MaxPool2d(2, 2))
