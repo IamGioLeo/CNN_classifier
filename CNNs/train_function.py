@@ -24,7 +24,7 @@ def train(device, output_file, train_loader, val_loader, epochs:int = 40, patien
         optimizer = optim.Adam(
             model.parameters(),
             lr=lr,
-            wd=weight_decay
+            weight_decay = weight_decay
         )
 
     train_losses, val_losses = [], []
