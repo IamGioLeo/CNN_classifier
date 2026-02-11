@@ -217,6 +217,7 @@ for values in product(*GRID.values()):
         annot=True,
         fmt="d",
         cmap="Blues",
+        cbar=True,
         xticklabels=trainval_dataset.classes,
         yticklabels=trainval_dataset.classes,
         square=True,
