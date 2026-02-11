@@ -62,7 +62,7 @@ def insert_in_csv(id = None, k_size=None, conv_fil=None, lr=None, opt=None, m=No
                   data_v=None, csv_name="csv_v1.csv"):       
         
         row = [_required_not_none(id),
-        _required_not_none(k_size), _required_not_none(conv_fil),
+        _empty_if_none(k_size), _empty_if_none(conv_fil),
         _nan_if_none(lr), _empty_if_none(opt),
         _nan_if_none(m), _nan_if_none(wd),
         _nan_if_none(p), _nan_if_none(b_size),
