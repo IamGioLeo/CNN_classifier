@@ -21,27 +21,29 @@ print(f"Using device: {device}")
 
 BATCH_SIZE = 32
 NUM_EPOCHS = [40]
-LEARNING_RATES = [0.001]
+LEARNING_RATES = [0.0001]
 MOMENTUMS = [0]
-WEIGHT_DECAY = [0.0]
+WEIGHT_DECAY = [0.001]
 PATIENCES = [3]
-KERNEL_SIZES = [3]
+KERNELS_SIZES = [3]
 CONV_FILTERS = [[8,16,32]]
-OPTIMIZER = "SGD"
-BATCH_NORM = False
+OPTIMIZER = "Adam"
+BATCH_NORM = True
 DROPOUT_P = [None]
-DATA_SPLIT_VERSION = "dataset_splits.pt"
-DATA_AUGMENTATION = "b" #"b" for the base dataset, "m" to add the mirrored images, "a" to add augmentation
-NET_VERSION = "shallow_final_" + DATA_AUGMENTATION
-CSV_NAME = "final.csv"
-
+DATA_SPLIT_VERSION = "dataset_splits_v_01.pt"
+DATA_AUGMENTATION = "a" #"b" for the base dataset, "m" to add the mirrored images, "a" to add augmentation
+NET_VERSION = "best_kernel_test_" + DATA_AUGMENTATION
+CSV_NAME = "best_kernels.csv"
+SAVE_RESULTS = False #flag to save results txt file on lacal machine
+SAVE_CSV = False #flag to save csv on lacal machine
+SAVE_IMAGES = False #flag to save plots as images on local machine
 
 GRID = {
     "lr": LEARNING_RATES,
     "momentum": MOMENTUMS,
     "epochs": NUM_EPOCHS,
     "patience": PATIENCES,
-    "kernel_size": KERNEL_SIZES,
+    "kernels_sizes": KERNELS_SIZES,
     "conv_filters": CONV_FILTERS,
     "weight_decay": WEIGHT_DECAY,
     "dropout_p": DROPOUT_P,
@@ -50,18 +52,18 @@ GRID = {
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
-
 output_dir = PROJECT_ROOT / "results/final"
-output_dir.mkdir(parents=True, exist_ok=True)
-
 file_name = f"{NET_VERSION}_results.txt" 
 output_file = output_dir / file_name
+if SAVE_RESULTS:
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-curves_dir = PROJECT_ROOT / "curves/final"
-curves_dir.mkdir(parents=True, exist_ok=True)
+if SAVE_IMAGES:
+    curves_dir = PROJECT_ROOT / "curves/shallow"
+    curves_dir.mkdir(parents=True, exist_ok=True)
 
-cm_dir = PROJECT_ROOT / "confusion_matrices/final"
-cm_dir.mkdir(parents=True, exist_ok=True)
+    cm_dir = PROJECT_ROOT / "confusion_matrices/shallow"
+    cm_dir.mkdir(parents=True, exist_ok=True)
 
 dataset_dir = PROJECT_ROOT / "dataset"
 
@@ -190,9 +192,9 @@ sns.set_theme(
     font_scale=0.9
 )
 
-
-with open(output_file, "a") as f:
-    f.write("\r\n\nNEW TRIANING SESSION")
+if SAVE_RESULTS:
+    with open(output_file, "a") as f:
+        f.write("\r\n\nNEW TRIANING SESSION")
 print("\r\n\nNEW TRIANING SESSION")
 
 
@@ -203,16 +205,17 @@ for values in product(*GRID.values()):
     momentum = params["momentum"]
     epochs = params["epochs"]
     patience = params["patience"]
-    kernel_size = params["kernel_size"]
+    kernels_sizes = params["kernels_sizes"]
     conv_filters = params["conv_filters"]
     wd = params["weight_decay"]
     dropout_p = params["dropout_p"]
 
-    with open(output_file, "a") as f:
-        f.write("\r\n" + "-"*100)
-        f.write(f"\r\nTraining with LEARNING_RATE={lr}, MOMENTUM={momentum}, EPOCHS={epochs}, PATIENCE={patience}, KERNEL_SIZES={kernel_size}, CONV_FILTERS={conv_filters}")
+    if SAVE_RESULTS:
+        with open(output_file, "a") as f:
+            f.write("\r\n" + "-"*100)
+            f.write(f"\r\nTraining with LEARNING_RATE={lr}, MOMENTUM={momentum}, EPOCHS={epochs}, PATIENCE={patience}, KERNELS_SIZES={kernels_sizes}, CONV_FILTERS={conv_filters}")
     print("\n" + "-"*100)
-    print(f"Training with LEARNING_RATE={lr}, MOMENTUM={momentum}, EPOCHS={epochs}, PATIENCE={patience}, KERNEL_SIZES={kernel_size}, CONV_FILTERS={conv_filters}")
+    print(f"Training with LEARNING_RATE={lr}, MOMENTUM={momentum}, EPOCHS={epochs}, PATIENCE={patience}, KERNELS_SIZES={kernels_sizes}, CONV_FILTERS={conv_filters}")
     model, train_losses, val_losses, train_accs, val_accs, global_correct, global_total, best_val_acc, best_val_loss, best_val_acc_epoch = train(
         device=device,
         output_file=output_file,
@@ -225,10 +228,11 @@ for values in product(*GRID.values()):
         momentum=momentum,
         weight_decay=wd,
         no_improve_break=False,
-        kernel_size=kernel_size,
+        kernels_sizes=kernels_sizes,
         conv_filters=conv_filters,
         batch_norm=BATCH_NORM,
-        dropout_p=dropout_p
+        dropout_p=dropout_p,
+        save_reasults_flag=SAVE_RESULTS
     )
     model.eval()
 
@@ -255,18 +259,23 @@ for values in product(*GRID.values()):
 
     global_accuracy = global_correct / global_total * 100
 
-    with open(output_file, "a") as f:
-        for line in [
-            f"\r\nGLOBAL ACCURACY | LR={lr}, Momentum={momentum} | Accuracy: {global_accuracy:.2f}%",
-            f"TEST ACCURACY | LR={lr}, Momentum={momentum} | Accuracy: {test_accuracy:.2f}%",
-            "Confusion Matrix:",
-            str(cm),
-            "-"*50
-        ]:
-            print(line)
-            f.write(line + "\n")
+    if SAVE_RESULTS:
+        with open(output_file, "a") as f:
+            for line in [
+                f"\r\nGLOBAL ACCURACY | LR={lr}, Momentum={momentum} | Accuracy: {global_accuracy:.2f}%",
+                f"TEST ACCURACY | LR={lr}, Momentum={momentum} | Accuracy: {test_accuracy:.2f}%",
+                "Confusion Matrix:",
+                str(cm),
+                "-"*50
+            ]:
+                f.write(line + "\n")
+    for line in [f"\r\nGLOBAL ACCURACY | LR={lr}, Momentum={momentum} | Accuracy: {global_accuracy:.2f}%",
+                f"TEST ACCURACY | LR={lr}, Momentum={momentum} | Accuracy: {test_accuracy:.2f}%",
+                "Confusion Matrix:",str(cm),"-"*50]:
+        print(line)
 
-    insert_all_rows_in_csv(k_size=kernel_size,conv_fil=conv_filters, 
+    if SAVE_CSV:
+        insert_all_rows_in_csv(k_size=kernels_sizes,conv_fil=conv_filters, 
                 lr=lr, opt=OPTIMIZER, m=momentum, wd=wd, p=patience,
                 b_size=BATCH_SIZE, epochs=epochs, epoch=best_val_acc_epoch, 
                 b_norm=BATCH_NORM, d_out=dropout_p, v_ls=val_losses,
@@ -275,86 +284,86 @@ for values in product(*GRID.values()):
                 data_aug=DATA_AUGMENTATION, csv_name=CSV_NAME)
             
 
+    if SAVE_IMAGES:
+        class_names = dataset.classes
 
-    class_names = dataset.classes
-
-    fig, ax = plt.subplots(figsize=(12, 10))
-    sns.heatmap(
-        cm,
-        annot=True,
-        fmt="d",
-        cmap="Blues",
-        cbar=True,
-        xticklabels=class_names,
-        yticklabels=class_names,
-        linewidths=0.5,
-        square=True,
-        ax=ax
-    )
-    ax.set_title("Confusion Matrix")
-    ax.set_xlabel("Predicted label")
-    ax.set_ylabel("True label")
-    fig.tight_layout()
-    matrix_name = f"{NET_VERSION}_confusion_matrix_lr_{lr}_m_{momentum}_e_{epochs}_p_{patience}_ks_{kernel_size}_cf_{conv_filters}.png"
-    fig.savefig(
-        cm_dir / matrix_name,
-        dpi=300,
-        bbox_inches="tight"
-    )
-    plt.close(fig)
+        fig, ax = plt.subplots(figsize=(12, 10))
+        sns.heatmap(
+            cm,
+            annot=True,
+            fmt="d",
+            cmap="Blues",
+            cbar=True,
+            xticklabels=class_names,
+            yticklabels=class_names,
+            linewidths=0.5,
+            square=True,
+            ax=ax
+        )
+        ax.set_title("Confusion Matrix")
+        ax.set_xlabel("Predicted label")
+        ax.set_ylabel("True label")
+        fig.tight_layout()
+        matrix_name = f"{NET_VERSION}_confusion_matrix_lr_{lr}_m_{momentum}_e_{epochs}_p_{patience}_ks_{kernels_sizes}_cf_{conv_filters}.png"
+        fig.savefig(
+            cm_dir / matrix_name,
+            dpi=300,
+            bbox_inches="tight"
+        )
+        plt.close(fig)
 
 
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-    # Loss
-    sns.lineplot(
-        x=np.arange(len(train_losses)),
-        y=train_losses,
-        ax=axes[0],
-        label="Train Loss",
-        marker="o"
-    )
-    sns.lineplot(
-        x=np.arange(len(val_losses)),
-        y=val_losses,
-        ax=axes[0],
-        label="Val Loss",
-        marker="o"
-    )
-    axes[0].set_title("Loss during training")
-    axes[0].set_xlabel("Epoch")
-    axes[0].set_ylabel("Loss")
-    axes[0].legend()
-    # Accuracy
-    sns.lineplot(
-        x=np.arange(len(train_accs)),
-        y=train_accs,
-        ax=axes[1],
-        label="Train Accuracy",
-        marker="o"
-    )
-    sns.lineplot(
-        x=np.arange(len(val_accs)),
-        y=val_accs,
-        ax=axes[1],
-        label="Val Accuracy",
-        marker="o"
-    )
-    # Test accuracy point
-    axes[1].scatter(
-        best_val_acc_epoch,
-        test_accuracy,
-        color="red",
-        s=80,
-        zorder=5,
-        label="Test Accuracy"
-    )
-    axes[1].set_title("Accuracy during training")
-    axes[1].set_xlabel("Epoch")
-    axes[1].set_ylabel("Accuracy")
-    axes[1].legend()
-    fig.tight_layout()
-    
-    fig_name = f"{NET_VERSION}_training_curves_lr_{lr}_m_{momentum}_e_{epochs}_p_{patience}_ks_{kernel_size}_cf_{conv_filters}.png"
-    fig.savefig(curves_dir / fig_name, dpi=300, bbox_inches="tight")
-    plt.close(fig)
+        fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+        # Loss
+        sns.lineplot(
+            x=np.arange(len(train_losses)),
+            y=train_losses,
+            ax=axes[0],
+            label="Train Loss",
+            marker="o"
+        )
+        sns.lineplot(
+            x=np.arange(len(val_losses)),
+            y=val_losses,
+            ax=axes[0],
+            label="Val Loss",
+            marker="o"
+        )
+        axes[0].set_title("Loss during training")
+        axes[0].set_xlabel("Epoch")
+        axes[0].set_ylabel("Loss")
+        axes[0].legend()
+        # Accuracy
+        sns.lineplot(
+            x=np.arange(len(train_accs)),
+            y=train_accs,
+            ax=axes[1],
+            label="Train Accuracy",
+            marker="o"
+        )
+        sns.lineplot(
+            x=np.arange(len(val_accs)),
+            y=val_accs,
+            ax=axes[1],
+            label="Val Accuracy",
+            marker="o"
+        )
+        # Test accuracy point
+        axes[1].scatter(
+            best_val_acc_epoch,
+            test_accuracy,
+            color="red",
+            s=80,
+            zorder=5,
+            label="Test Accuracy"
+        )
+        axes[1].set_title("Accuracy during training")
+        axes[1].set_xlabel("Epoch")
+        axes[1].set_ylabel("Accuracy (%)")
+        axes[1].legend()
+        fig.tight_layout()
+
+        fig_name = f"{NET_VERSION}_training_curves_lr_{lr}_m_{momentum}_e_{epochs}_p_{patience}_ks_{kernels_sizes}_cf_{conv_filters}.png"
+        fig.savefig(curves_dir / fig_name, dpi=300, bbox_inches="tight")
+        plt.close(fig)

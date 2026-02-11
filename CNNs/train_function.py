@@ -12,9 +12,9 @@ from net_improve import ResizedConvFilterCNN
 
 
 
-def train(device, output_file, train_loader, val_loader, epochs:int = 40, patience: int = 3, optimizer = "SGD", lr: float = 0.001, momentum: float = 0, weight_decay: float = 0, no_improve_break = True, kernel_size: int = 3, conv_filters = [8, 16, 32] , batch_norm = False, dropout_p = None, model_name = "best_model.pt"):
+def train(device, output_file, train_loader, val_loader, epochs:int = 40, patience: int = 3, optimizer = "SGD", lr: float = 0.001, momentum: float = 0, weight_decay: float = 0, no_improve_break = True, kernels_sizes = [3, 3, 3], conv_filters = [8, 16, 32] , batch_norm = False, dropout_p = None, model_name = "best_model.pt", save_reasults_flag: bool = True):
 
-    model = ResizedConvFilterCNN(kernel_size=kernel_size, list_out_channels=conv_filters, batch_norm=batch_norm, dropout_p=dropout_p).to(device)
+    model = ResizedConvFilterCNN(kernels_sizes=kernels_sizes, list_out_channels=conv_filters, batch_norm=batch_norm, dropout_p=dropout_p).to(device)
 
     criterion = nn.CrossEntropyLoss()
 
@@ -88,13 +88,14 @@ def train(device, output_file, train_loader, val_loader, epochs:int = 40, patien
         val_losses.append(val_loss)
         val_accs.append(val_acc)
 
-        with open(output_file, "a") as f:
-            for line in [
-                f"\r\nEpoch [{epoch+1}/{epochs}] | "
-                f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
-                f"Val Loss {val_loss:.4f} | Val Acc: {val_acc:.2f}%"
-            ]:
-                f.write(line)
+        if save_reasults_flag:
+            with open(output_file, "a") as f:
+                for line in [
+                    f"\r\nEpoch [{epoch+1}/{epochs}] | "
+                    f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
+                    f"Val Loss {val_loss:.4f} | Val Acc: {val_acc:.2f}%"
+                ]:
+                    f.write(line)
         print(
             f"Epoch [{epoch+1}/{epochs}] | "
             f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}% | "
@@ -114,8 +115,9 @@ def train(device, output_file, train_loader, val_loader, epochs:int = 40, patien
 
         if epochs_no_improve >= patience and not patience_trigger:
             patience_trigger = True
-            with open(output_file, "a") as f:
-                f.write("\r\nEarly stopping triggered\n")
+            if save_reasults_flag:
+                with open(output_file, "a") as f:
+                    f.write("\r\nEarly stopping triggered\n")
             print("Early stopping triggered")
             if no_improve_break:
                 break
@@ -143,7 +145,7 @@ def train(device, output_file, train_loader, val_loader, epochs:int = 40, patien
 
 
 
-def finetune_alexnet(device, output_file, train_loader, val_loader, epochs: int = 40, patience: int = 3, optimizer_name: str = "SGD", lr: float = 1e-3, momentum: float = 0.9, weight_decay: float = 0, no_improve_break: bool = True, model_name: str = "best_alexnet.pt"):
+def finetune_alexnet(device, output_file, train_loader, val_loader, epochs: int = 40, patience: int = 3, optimizer_name: str = "SGD", lr: float = 1e-3, momentum: float = 0.9, weight_decay: float = 0, no_improve_break: bool = True, model_name: str = "best_alexnet.pt", save_reasults_flag: bool = True):
     weights = AlexNet_Weights.DEFAULT
     model = models.alexnet(weights=weights)
 
@@ -238,8 +240,9 @@ def finetune_alexnet(device, output_file, train_loader, val_loader, epochs: int 
         )
 
         print(log_line)
-        with open(output_file, "a") as f:
-            f.write("\n" + log_line)
+        if save_reasults_flag:
+            with open(output_file, "a") as f:
+                f.write("\n" + log_line)
 
 
         if not patience_trigger and val_acc > best_val_acc:

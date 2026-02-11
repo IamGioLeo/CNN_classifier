@@ -2,23 +2,23 @@ import torch.nn as nn
 import numpy as np
 
 class ResizedConvFilterCNN(nn.Module):
-    def __init__(self, kernel_size: int = 3, list_out_channels = [8, 16, 32], batch_norm = False, dropout_p = None):
+    def __init__(self, kernels_sizes: int = 3, list_out_channels = [8, 16, 32], batch_norm = False, dropout_p = None):
         super().__init__()
 
-        if kernel_size not in [3,5,7,9]:
+        if kernels_sizes not in [3,5,7,9]:
             raise ValueError("Kernel size not feasible")
         
         if len(list_out_channels) > 5:
             raise ValueError("Net depth not feasible")
 
-        padding = kernel_size // 2
+        padding = kernels_sizes // 2
 
         layers = []
         in_channels = 1
         input_side_length: int = 64
 
         for i, out_channels in enumerate(list_out_channels):
-            block = [nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=1, padding=padding)]
+            block = [nn.Conv2d(in_channels, out_channels, kernel_size=kernels_sizes, stride=1, padding=padding)]
             
             if batch_norm:
                 block.append(nn.BatchNorm2d(out_channels))

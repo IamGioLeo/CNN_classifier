@@ -23,6 +23,9 @@ DATA_SPLIT_VERSION = "dataset_splits.pt"
 SVM_VERSION = "svm"
 SVM_CSV_NAME = "svm_final.csv"
 SVM_C = [1e-3, 1e-2, 1e-1, 1.0, 10.0, 100.0]
+SAVE_RESULTS = False #flag to save results txt file on lacal machine
+SAVE_CSV = False #flag to save csv on lacal machine
+SAVE_IMAGES = False #flag to save plots as images on local machine
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -30,11 +33,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 svm_output_dir = PROJECT_ROOT / "results/svm"
-svm_output_dir.mkdir(parents=True, exist_ok=True)
 svm_output_file = svm_output_dir / f"{SVM_VERSION}_results.txt"
+if SAVE_RESULTS:
+    svm_output_dir.mkdir(parents=True, exist_ok=True)
 
-svm_cm_dir = PROJECT_ROOT / "confusion_matrices/svm"
-svm_cm_dir.mkdir(parents=True, exist_ok=True)
+if SAVE_IMAGES:
+    svm_cm_dir = PROJECT_ROOT / "confusion_matrices/svm"
+    svm_cm_dir.mkdir(parents=True, exist_ok=True)
 
 dataset_dir = PROJECT_ROOT / "dataset"
 
@@ -156,56 +161,59 @@ test_acc_svm = svm_model.score(features_test_scaled, labels_test) * 100
 
 print(f"SVM FINAL Test Accuracy (C={best_c}): {test_acc_svm:.2f}%")
 
-
-insert_all_rows_in_csv(
-    k_size=None,
-    conv_fil=None,
-    lr=None,
-    opt="LinearSVM",
-    m=None,
-    wd=None,
-    p=None,
-    b_size=BATCH_SIZE,
-    epochs=1,
-    epoch=0,
-    b_norm=None,
-    d_out=features_train.shape[1],  # 4096
-    v_ls=list(svm_results.values()),
-    tr_ls=[None],
-    v_accs=list(svm_results.values()),
-    tr_accs=[None],
-    te_acc=test_acc_svm,
-    data_v=DATA_SPLIT_VERSION,
-    data_aug="b",
-    csv_name=SVM_CSV_NAME
-)
+if SAVE_CSV:
+    insert_all_rows_in_csv(
+        k_size=None,
+        conv_fil=None,
+        lr=None,
+        opt="LinearSVM",
+        m=None,
+        wd=None,
+        p=None,
+        b_size=BATCH_SIZE,
+        epochs=1,
+        epoch=0,
+        b_norm=None,
+        d_out=features_train.shape[1],  # 4096
+        v_ls=list(svm_results.values()),
+        tr_ls=[None],
+        v_accs=list(svm_results.values()),
+        tr_accs=[None],
+        te_acc=test_acc_svm,
+        data_v=DATA_SPLIT_VERSION,
+        data_aug="b",
+        csv_name=SVM_CSV_NAME
+    )
 
 
 cm_svm = confusion_matrix(
     labels_test,
     svm_model.predict(features_test_scaled)
 )
+print("Confusion Matrix:")
+print(cm_svm)
 
-fig, ax = plt.subplots(figsize=(12, 10))
-sns.heatmap(
-    cm_svm,
-    annot=True,
-    fmt="d",
-    cmap="Blues",
-    cbar=True,
-    xticklabels=trainval_dataset.classes,
-    yticklabels=trainval_dataset.classes,
-    square=True,
-    ax=ax
-)
+if SAVE_IMAGES:
+    fig, ax = plt.subplots(figsize=(12, 10))
+    sns.heatmap(
+        cm_svm,
+        annot=True,
+        fmt="d",
+        cmap="Blues",
+        cbar=True,
+        xticklabels=trainval_dataset.classes,
+        yticklabels=trainval_dataset.classes,
+        square=True,
+        ax=ax
+    )
 
-ax.set_title("SVM Confusion Matrix")
-ax.set_xlabel("Predicted label")
-ax.set_ylabel("True label")
+    ax.set_title("SVM Confusion Matrix")
+    ax.set_xlabel("Predicted label")
+    ax.set_ylabel("True label")
 
-fig.savefig(
-    svm_cm_dir / f"{SVM_VERSION}_bestC_{best_c}_confusion_matrix.png",
-    dpi=300,
-    bbox_inches="tight"
-)
-plt.close(fig)
+    fig.savefig(
+        svm_cm_dir / f"{SVM_VERSION}_bestC_{best_c}_confusion_matrix.png",
+        dpi=300,
+        bbox_inches="tight"
+    )
+    plt.close(fig)
