@@ -1,9 +1,7 @@
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader, ConcatDataset, Subset
+from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 from itertools import product
-import numpy as np
 import os
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -136,9 +134,6 @@ test_loader  = DataLoader(test_set, batch_size=BATCH_SIZE, shuffle=False)
 
 
 
-
-
-
 sns.set_theme(style="whitegrid", context="talk", font_scale=0.9)
 
 
@@ -230,9 +225,9 @@ for values in product(*GRID.values()):
     ax.set_title("AlexNet Confusion Matrix")
     ax.set_xlabel("Predicted label")
     ax.set_ylabel("True label")
-
+    matrix_name = f"{ALEXNET_VERSION}_confusion_matrix_lr_{params["lr"]}_m_{params["momentum"]}_wd_{params["weight_decay"]}.png"
     fig.savefig(
-        alexnet_cm_dir / f"{ALEXNET_VERSION}_confusion_matrix.png",
+        alexnet_cm_dir / matrix_name,
         dpi=300,
         bbox_inches="tight"
     )
@@ -242,20 +237,54 @@ for values in product(*GRID.values()):
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
 
-    sns.lineplot(x=range(len(train_losses)), y=train_losses, ax=axes[0], label="Train Loss")
-    sns.lineplot(x=range(len(val_losses)), y=val_losses, ax=axes[0], label="Val Loss")
+    sns.lineplot(
+        x=range(len(train_losses)), 
+        y=train_losses, 
+        ax=axes[0], 
+        label="Train Loss",
+        marker="o"
+    )
+    sns.lineplot(
+        x=range(len(val_losses)), 
+        y=val_losses, 
+        ax=axes[0], 
+        label="Val Loss",
+        marker="o"
+    )
+    
     axes[0].set_title("Loss")
 
-    sns.lineplot(x=range(len(train_accs)), y=train_accs, ax=axes[1], label="Train Acc")
-    sns.lineplot(x=range(len(val_accs)), y=val_accs, ax=axes[1], label="Val Acc")
-    axes[1].set_title("Accuracy")
+    sns.lineplot(
+        x=range(len(train_accs)), 
+        y=train_accs, ax=axes[1], 
+        label="Train Acc",
+        marker="o"
+    )
+    sns.lineplot(
+        x=range(len(val_accs)), 
+        y=val_accs,
+        ax=axes[1], 
+        label="Val Acc",
+        marker="o"
+    )
 
+    axes[1].scatter(
+        best_val_acc_epoch,
+        test_accuracy,
+        color="red",
+        s=80,
+        zorder=5,
+        label="Test Accuracy"
+    )
+    axes[1].set_title("Accuracy during training")
+    axes[1].set_xlabel("Epoch")
+    axes[1].set_ylabel("Accuracy")
+    axes[1].legend()
     fig.tight_layout()
+    fig_name = f"{ALEXNET_VERSION}_training_curves_lr_{params["lr"]}_m_{params["momentum"]}_wd_{params["weight_decay"]}.png"
     fig.savefig(
-        alexnet_curves_dir / f"{ALEXNET_VERSION}_training_curves.png",
+        alexnet_curves_dir / fig_name,
         dpi=300,
         bbox_inches="tight"
     )
     plt.close(fig)
-
-
